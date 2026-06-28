@@ -25,58 +25,6 @@ Modulinė OTDR matavimų (SOR formatu) analizės priemonė su kelių bangų ilgi
 
 ## Diegimas ir paleidimas
 
-1.  **Atsisiųskite arba klonuokite repozitoriją.**
-
-2.  **Nukopijuokite visus failus** į norimą aplanką. Struktūra turi būti tokia:
-
-```
-OTDR_Analyser/
-    public/
-        index.html
-        css/
-            styles.css
-        js/
-            config.js
-            utils.js
-            state.js
-            translations.js
-            parser.js
-            diagnostics.js
-            render.js
-            chart.js
-            ai.js
-            export.js
-            app.js
-    README.md
-```
-
-# OTDR SOR Analizatorius
-
-Modulinė OTDR matavimų (SOR formatu) analizės priemonė su kelių bangų ilgių palyginimu, AI diagnostika (Claude) ir ataskaitų eksportu.
-
-## Savybės
-
-- **SOR failų nuskaitymas** – palaiko standartinį SOR formatą (Map / non‑Map).
-- **Kelių bangų ilgių analizė** – automatiškai atpažįsta 1310, 1383, 1490, 1550, 1625 nm.
-- **Įvykių (eventų) atpažinimas** – suvirinimai, atspindžiai, WDM/PON, kabelio galai.
-- **Išsami diagnostika** – slopinimas, ORL, makrolenkimai, vandens smailė, splitter identifikavimas.
-- **Kokybės balas** – nuo 0 iki 100, su spalvotu vertinimu.
-- **Interaktyvūs grafikai** – vilkite A/B žymeklius, kad matuotumėte nuostolius atkarpoje.
-- **Eventų juosta** – vizualus įvykių išdėstymas palei skaidulą.
-- **Claude AI integracija** – generuokite technines ataskaitas lietuvių ar anglų kalba.
-- **Dvikalbė sąsaja** – visas vartotojo sąsaja gali būti rodoma lietuvių arba anglų kalba.
-- **Eksportas** – į Excel (XLSX) ir PDF.
-
-## Technologijos
-
-- HTML5 / CSS3 / JavaScript (ES modules)
-- [Chart.js](https://www.chartjs.org/) – reflektogramos braižymas
-- [Tabler Icons](https://tabler.io/icons) – piktogramos
-- [SheetJS](https://sheetjs.com/) – Excel eksportas
-- [jsPDF](https://github.com/parallax/jsPDF) + [jspdf-autotable](https://github.com/simonbengtsson/jspdf-autotable) – PDF eksportas
-
-## Diegimas ir paleidimas
-
 1. Atsisiųskite arba klonuokite repozitoriją.
 
 2. Įsitikinkite, kad aplankų struktūra yra tokia:
