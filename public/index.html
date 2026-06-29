@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OTDR SOR Analizatorius · Modular</title>
+    <!-- External deps -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="css/styles.css" />
+
+    <!-- Import map for ES modules -->
+    <script type="importmap">
+        {
+            "imports": {
+                "./js/config.js": "./js/config.js",
+                "./js/utils.js": "./js/utils.js",
+                "./js/state.js": "./js/state.js",
+                "./js/parser.js": "./js/parser.js",
+                "./js/diagnostics.js": "./js/diagnostics.js",
+                "./js/render.js": "./js/render.js",
+                "./js/chart.js": "./js/chart.js",
+                "./js/ai.js": "./js/ai.js",
+                "./js/export.js": "./js/export.js",
+                "./js/translations.js": "./js/translations.js",
+                "./js/app.js": "./js/app.js"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <!-- ═══ HEADER ═══ -->
+    <header class="hdr">
+        <div class="hdr-logo">〰</div>
+        <div>
+            <h1 data-i18n="app_title">OTDR SOR Analizatorius</h1>
+            <p data-i18n="app_subtitle">Multi‑λ · AI diagnostika · v3.0 · modular</p>
+        </div>
+        <div class="hdr-actions">
+            <!-- Language toggles -->
+            <div class="lang-sel" style="margin-right:8px;">
+                <button class="lang-btn active" data-lang="lt" data-i18n="ai_lang_lt">🇱🇹 LT</button>
+                <button class="lang-btn" data-lang="en" data-i18n="ai_lang_en">🇬🇧 EN</button>
+            </div>
+            <button class="btn sm" id="btnExcel" disabled data-i18n="btn_excel"><i class="ti ti-table-export"></i> Excel</button>
+            <button class="btn sm" id="btnPdf" disabled data-i18n="btn_pdf"><i class="ti ti-file-type-pdf"></i> PDF</button>
+            <button class="btn primary" id="btnAnalyze" disabled data-i18n="btn_analyze"><i class="ti ti-search"></i> Analizuoti</button>
+        </div>
+    </header>
+
+    <!-- ═══ LAYOUT ═══ -->
+    <div class="layout">
+
+        <!-- TOPBAR -->
+        <div class="topbar">
+            <div class="topbar-inner">
+
+                <!-- Files -->
+                <div class="tb-section" style="min-width:200px;max-width:340px;">
+                    <h2 data-i18n="label_files">SOR failai <span id="fileCount" style="color:var(--teal);font-weight:700;"></span></h2>
+                    <div style="display:flex;gap:4px;">
+                        <label class="btn sm" style="cursor:pointer;" data-i18n="btn_files">
+                            <i class="ti ti-files"></i> Failai
+                            <input type="file" id="pickFiles" multiple accept=".sor,.SOR" style="display:none" />
+                        </label>
+                        <label class="btn sm" style="cursor:pointer;" data-i18n="btn_folder">
+                            <i class="ti ti-folder-open"></i> Aplankas
+                            <input type="file" id="pickDir" webkitdirectory multiple style="display:none" />
+                        </label>
+                        <button class="btn sm danger" id="btnClear" title="Išvalyti viską" style="display:none" data-i18n="btn_clear">
+                            <i class="ti ti-trash"></i>
+                        </button>
+                    </div>
+                    <div class="file-list" id="fileList">
+                        <span style="font-size:11px;color:var(--muted)" data-i18n="label_no_files">Nepasirinkta failų</span>
+                    </div>
+                </div>
+
+                <!-- Options -->
+                <div class="tb-section" style="justify-content:center;">
+                    <h2 data-i18n="label_options">Parinktys</h2>
+                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;color:var(--muted);white-space:nowrap;">
+                        <input type="checkbox" id="chkWdm" style="accent-color:var(--blue);" />
+                        <span data-i18n="label_wdm">Linijoje yra WDM / PON</span>
+                    </label>
+                    <div class="prog-bar" id="progBar" style="display:none;margin-top:2px">
+                        <div class="prog-fill" id="progFill" style="width:0"></div>
+                    </div>
+                    <div id="statusMsg" style="font-size:10px;color:var(--muted);min-height:13px;"></div>
+                </div>
+
+                <!-- API key -->
+                <div class="tb-section" style="justify-content:center;min-width:200px;">
+                    <h2 data-i18n="label_api_key">Claude AI raktas</h2>
+                    <div style="display:flex;gap:4px;">
+                        <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off"
+                        style="flex:1;min-width:130px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:3px 7px;color:var(--text);font-size:11px;font-family:'JetBrains Mono',monospace;" />
+                        <button class="btn sm" id="btnSaveKey" data-i18n="btn_save_key"><i class="ti ti-device-floppy"></i></button>
+                    </div>
+                    <div style="font-size:10px;color:var(--muted);">
+                        <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--blue);" data-i18n="label_get_api">Gauti API raktą →</a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- MAIN -->
+        <div class="main">
+
+            <!-- Empty state -->
+            <div id="emptyMain" class="empty">
+                <i class="ti ti-wave-sine"></i>
+                <p data-i18n="label_empty_state">Pasirinkite <strong>.sor</strong> failus ir spauskite <strong>Analizuoti</strong></p>
+            </div>
+
+            <!-- Results wrapper -->
+            <div id="resultsWrap" style="display:none">
+
+                <!-- Tabs -->
+                <div class="tabs">
+                    <div class="tab active" data-tab="overview" data-i18n="tab_overview">Apžvalga</div>
+                    <div class="tab" data-tab="trace" data-i18n="tab_trace">Grafikai</div>
+                    <div class="tab" data-tab="events" data-i18n="tab_events">Event'ai</div>
+                    <div class="tab" data-tab="diags" data-i18n="tab_diags">Diagnostika</div>
+                    <div class="tab" data-tab="comp" data-i18n="tab_comp">λ Palyginimas</div>
+                    <div class="tab" data-tab="ai" data-i18n="tab_ai">🤖 Claude AI</div>
+                </div>
+
+                <!-- Overview -->
+                <div class="tab-content active" id="tab-overview">
+                    <div class="metrics" id="ovMetrics"></div>
+                    <div class="card">
+                        <div class="card-title"><i class="ti ti-alert-circle" style="color:var(--teal)"></i> <span data-i18n="tab_overview">Svarbiausi radiniai</span></div>
+                        <div id="ovDiags"></div>
+                    </div>
+                </div>
+
+                <!-- Trace -->
+                <div class="tab-content" id="tab-trace">
+                    <div class="card">
+                        <div class="card-title"><i class="ti ti-wave-sine" style="color:var(--teal)"></i> <span data-i18n="tab_trace">Reflektograma</span></div>
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:.5rem;">
+                            <div class="wl-btns" id="wlBtns" style="margin:0;flex:1;"></div>
+                            <span id="abLoss" style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:var(--teal);white-space:nowrap;" data-i18n="label_ab_loss">A→B: —</span>
+                            <button class="btn sm" id="btnResetAB" title="Atstatyti A/B" data-i18n="btn_reset_ab">↺</button>
+                        </div>
+                        <div style="font-size:10px;color:var(--muted);margin-bottom:4px;" data-i18n="label_trace_hint">
+                            <i class="ti ti-drag-drop" style="font-size:12px"></i> Vilkite <b style="color:var(--yellow)">A</b> ir <b style="color:var(--red)">B</b> žymeklius pele ant grafiko
+                        </div>
+                        <div class="chart-legend" id="traceLegend" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;font-size:11px;"></div>
+                        <div style="position:relative;">
+                            <div class="chart-wrap"><canvas id="traceChart"></canvas></div>
+                            <canvas id="overlayCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;"></canvas>
+                        </div>
+                    </div>
+                    <div class="card" style="overflow:visible;">
+                        <div class="card-title"><i class="ti ti-timeline" style="color:var(--blue)"></i> <span data-i18n="tab_events">Event juosta</span></div>
+                        <div id="evStrip" style="overflow-x:auto;overflow-y:visible;padding-top:4px;"></div>
+                        <div id="evStripInfo" style="margin-top:6px;min-height:22px;font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;padding:3px 6px;background:var(--bg2);border-radius:5px;opacity:.5;" data-i18n="label_legend_hover">
+                            ← Užveskite pelę ant ikonėlės
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Events -->
+                <div class="tab-content" id="tab-events">
+                    <div class="card" style="padding:10px 12px;margin-bottom:.5rem;">
+                        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+                            <i class="ti ti-list-details" style="color:var(--teal)"></i>
+                            <span style="font-size:12px;font-weight:500;" data-i18n="label_consolidate">Apjungti event'ai</span>
+                            <select id="evFilterWl" class="btn sm" style="padding:2px 5px;"></select>
+                            <select id="evFilterType" class="btn sm" style="padding:2px 5px;">
+                                <option value="" data-i18n="label_all_types">Visi tipai</option>
+                                <option value="splice" data-i18n="filter_splice">Suvirinim.</option>
+                                <option value="refl" data-i18n="filter_refl">Atspindžiai</option>
+                                <option value="wdm" data-i18n="filter_wdm">WDM/PON</option>
+                                <option value="end" data-i18n="filter_end">Pabaiga</option>
+                            </select>
+                            <label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;margin-left:auto;">
+                                <input type="checkbox" id="evConsolidate" checked style="accent-color:var(--teal)" /> <span data-i18n="label_consolidate">Apjungti</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div id="eventsBody"></div>
+                </div>
+
+                <!-- Diagnostics -->
+                <div class="tab-content" id="tab-diags">
+                    <div id="diagsWrap"></div>
+                </div>
+
+                <!-- Comparison -->
+                <div class="tab-content" id="tab-comp">
+                    <div id="compWrap"></div>
+                </div>
+
+                <!-- AI -->
+                <div class="tab-content" id="tab-ai">
+                    <div class="ai-box">
+                        <div class="ai-title"><i class="ti ti-robot"></i> <span data-i18n="tab_ai">Claude AI analizė</span></div>
+                        <div class="lang-sel">
+                            <button class="lang-btn active" data-lang="lt" data-i18n="ai_lang_lt">🇱🇹 LT</button>
+                            <button class="lang-btn" data-lang="en" data-i18n="ai_lang_en">🇬🇧 EN</button>
+                            <button class="lang-btn" data-lang="both" data-i18n="ai_lang_both">Abu</button>
+                        </div>
+                        <button class="btn primary" id="btnAiAnalyze" style="margin-bottom:9px;" data-i18n="btn_ai_analyze">
+                            <i class="ti ti-sparkles"></i> Analizuoti su Claude
+                        </button>
+                        <div id="aiContent" class="ai-content" style="display:none"></div>
+                    </div>
+                </div>
+
+            </div><!-- /resultsWrap -->
+        </div><!-- /main -->
+    </div><!-- /layout -->
+
+    <div class="toast-wrap" id="toastWrap"></div>
+
+    <!-- Main entry point -->
+    <script type="module" src="js/app.js"></script>
+
+</body>
+</html>
