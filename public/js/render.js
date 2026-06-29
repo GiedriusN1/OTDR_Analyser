@@ -4,7 +4,16 @@ import { t } from './utils.js';
 import { classifyEvent, consolidateEvents } from './diagnostics.js';
 import { setupTraceChart, drawOverlay } from './chart.js';
 
-// ── Overview ──
+export function renderAll() {
+    const ok = state.parsed.filter(p => p.ok);
+    const wls = [...state.activeWls].sort();
+    renderOverview(ok, wls);
+    renderTrace(ok, wls);
+    renderEvents(ok);
+    renderDiags();
+    renderComp(ok, wls);
+}
+
 export function renderOverview(ok, wls) {
     const allD = state.diagnostics.flatMap(g => [
         ...g.cross_wl.map(d => ({ ...d, _scope: t('diag_scope_cross_wl') })),
@@ -37,23 +46,45 @@ export function renderOverview(ok, wls) {
     ).join('') || '<div class="diag-item info"><div class="diag-icon">🔵</div><div class="diag-body"><div class="msg">' + t('diag_general_ok') + '</div></div></div>';
 }
 
-// ── Render Events (only the dynamic labels changed) ──
-export function renderEvents(ok) {
-    // ... existing code ...
-    // Inside the rendering, replace hardcoded strings:
-    // 'Suvirinimas' -> t('event_splice')
-    // 'Atspindys' -> t('event_refl')
-    // 'Kabelio galas' -> t('event_end')
-    // 'WDM/PON' -> t('event_wdm')
-    // 'Event' -> t('event_other')
-    // 'Visi λ' -> t('label_all_wavelengths')
-    // 'Visi tipai' -> t('label_all_types')
-    // 'Nėra event\'ų' -> t('label_event_strip_empty')
-    // Also the table headers: 'Failas' -> t('metrics_files'), 'λ nm' -> 'λ ' + t('unit_nm'), etc.
-    // (I'll include the full updated renderEvents function below, but you get the idea)
+export function renderTrace(ok, wls) {
+    document.getElementById('wlBtns').innerHTML = wls.map(wl =>
+        '<button class="wl-btn active" data-wl="' + wl + '">' + wl + ' ' + t('unit_nm') + '</button>'
+    ).join('');
+    document.querySelectorAll('.wl-btn').forEach(b => {
+        b.addEventListener('click', () => {
+            const wl = parseFloat(b.dataset.wl);
+            if (state.activeWls.has(wl)) {
+                state.activeWls.delete(wl);
+                b.classList.remove('active');
+            } else {
+                state.activeWls.add(wl);
+                b.classList.add('active');
+            }
+            if (window.traceChart) {
+                window.traceChart.data.datasets.forEach(ds => {
+                    ds.hidden = !state.activeWls.has(ds._wl);
+                });
+                window.traceChart.update();
+            }
+            drawOverlay();
+            renderEventStrip(state.parsed.filter(p => p.ok));
+        });
+    });
+
+    document.getElementById('traceLegend').innerHTML = ok.map(s => {
+        const col = WL_COLORS[Math.round(s.wavelength)] || '#888';
+        return '<div style="display:flex;align-items:center;gap:4px;cursor:pointer">' +
+            '<div style="width:14px;height:3px;background:' + col + ';border-radius:2px;flex-shrink:0"></div>' +
+            '<span style="color:var(--muted)">' + s.file + ' (' + s.wavelength + 'nm)</span></div>';
+    }).join('');
+
+    setupTraceChart(ok);
+    setTimeout(() => {
+        drawOverlay();
+        renderEventStrip(ok);
+    }, 350);
 }
 
-// ── Full updated renderEvents (for completeness) ──
 export function renderEvents(ok) {
     const wls = [...new Set(ok.map(s => Math.round(s.wavelength)))].sort();
     document.getElementById('evFilterWl').innerHTML =
@@ -98,7 +129,7 @@ export function renderEvents(ok) {
                     '<div style="display:flex;gap:12px;flex-wrap:wrap">' + wlSummary + '</div>' +
                     (worst ? '<div style="margin-top:6px;font-size:11px;color:var(--muted)">' + SI[worst.sev] + ' ' + worst.msg + ' <i>💡 ' + worst.rec + '</i></div>' : '') +
                     '</div>';
-            }).join('') || '<div class="empty"><p>' + t('label_event_strip_empty') + '</p></div>';
+            }).join('') || '<div class="empty"><p>' + t('diag_event_strip_empty') + '</p></div>';
         } else {
             const rows = groups.flatMap(g => g.events);
             document.getElementById('eventsBody').innerHTML =
@@ -130,7 +161,28 @@ export function renderEvents(ok) {
     document.getElementById('evConsolidate').onchange = render;
 }
 
-// ── Comparison tab ──
+export function renderDiags() {
+    const SI = { critical: '🔴', warning: '🟡', info: '🔵' };
+    let html = '';
+    for (const grp of state.diagnostics) {
+        const col = grp.grade?.color || '#888';
+        html += '<div class="group-hdr"><i class="ti ti-folder" style="font-size:11px"></i> ' + grp.group +
+            ' <span class="score-badge" style="background:' + col + '22;color:' + col + '">' + Math.round(grp.score) + '/100 ' + (grp.grade?.label_lt || '') + '</span></div>';
+        if (grp.cross_wl.length) {
+            html += '<div class="card" style="margin-bottom:.4rem"><div class="card-title"><i class="ti ti-arrows-diff" style="color:var(--blue)"></i> ' + t('diag_scope_cross_wl') + '</div>';
+            html += grp.cross_wl.map(d => '<div class="diag-item ' + d.sev + '"><div class="diag-icon">' + SI[d.sev] + '</div><div class="diag-body"><div class="cat">' + d.category + '</div><div class="msg">' + d.msg + '</div><div class="rec">💡 ' + d.rec + '</div></div></div>').join('');
+            html += '</div>';
+        }
+        for (const [wl, diags] of Object.entries(grp.per_file)) {
+            const wc = WL_COLORS[wl] || '#888';
+            html += '<div class="card" style="margin-bottom:.4rem"><div class="card-title"><span style="color:' + wc + '">●</span> ' + wl + ' ' + t('unit_nm') + '</div>';
+            html += diags.map(d => '<div class="diag-item ' + d.sev + '"><div class="diag-icon">' + SI[d.sev] + '</div><div class="diag-body"><div class="cat">' + d.category + '</div><div class="msg">' + d.msg + '</div><div class="rec">💡 ' + d.rec + '</div></div></div>').join('');
+            html += '</div>';
+        }
+    }
+    document.getElementById('diagsWrap').innerHTML = html || '<div class="empty"><p>' + t('comp_no_data') + '</p></div>';
+}
+
 export function renderComp(ok, wls) {
     const el = document.getElementById('compWrap');
     if (wls.length < 2) {
@@ -190,5 +242,55 @@ export function renderComp(ok, wls) {
     el.innerHTML = html || '<div class="empty"><p>' + t('comp_no_data') + '</p></div>';
 }
 
-// ── Keep renderDiags, renderTrace, renderEventStrip, evStripHover similar but replace static strings with t() ──
-// ... (the pattern is the same: replace 'Suvirinimas' with t('event_splice'), 'Kritinis' with t('severity_critical'), etc.)
+export function renderEventStrip(ok) {
+    const el = document.getElementById('evStrip');
+    if (!el) return;
+    const visibleSors = ok.filter(s => state.activeWls.has(Math.round(s.wavelength)));
+    const groups = consolidateEvents(visibleSors.length ? visibleSors : ok);
+    if (!groups.length) { el.innerHTML = '<div style="color:var(--muted);font-size:11px">' + t('diag_event_strip_empty') + '</div>'; return; }
+    const totalKm = Math.max(...ok.map(s => s.range_km), 1);
+    const ICONS = {
+        splice: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><line x1="8" y1="4" x2="8" y2="12" stroke="currentColor" stroke-width="1.5"/></svg>',
+        refl: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><polyline points="4,12 8,4 12,12" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>',
+        wdm: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/><text x="8" y="11" font-size="6" fill="currentColor" text-anchor="middle" font-family="monospace">MUX</text></svg>',
+        end: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><line x1="2" y1="8" x2="11" y2="8" stroke="currentColor" stroke-width="1.5"/><polyline points="8,5 12,8 8,11" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="13" y1="4" x2="13" y2="12" stroke="currentColor" stroke-width="2"/></svg>',
+        other: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.5"/></svg>',
+    };
+    let html = '<div class="ev-strip">';
+    html += '<div class="ev-node"><div class="ev-icon other" style="width:26px;height:26px;font-size:9px;font-weight:700;">OTDR</div><div class="ev-dist">0.000</div></div>';
+    let prevDist = 0;
+    groups.forEach((g, gi) => {
+        const type = g.events[0] ? classifyEvent(g.events[0]) : 'other';
+        const segKm = g.dist - prevDist;
+        const segPct = segKm / totalKm * 100;
+        const minW = Math.max(22, segPct * 3);
+        const avgLoss = g.events.reduce((s, e) => s + e.loss, 0) / g.events.length;
+        const lossCol = avgLoss > RULES.splice.critical ? '#e05c5c' : avgLoss > RULES.splice.warn ? '#f0c84f' : avgLoss > 0.01 ? '#00d4aa' : '#555';
+        const wlSpans = [...new Set(g.events.map(e => e.wl))].sort().map(w => '<span style="color:' + WL_COLORS[w] + ';font-size:8px">' + w + '</span>').join(' ');
+        const tipStr = (gi + 1) + ' · ' + g.dist.toFixed(3) + ' ' + t('unit_km') + ' · ' + g.events.map(e => e.wl + 'nm:' + e.loss.toFixed(2) + 'dB').join(' ');
+
+        html += '<div class="ev-seg" style="min-width:' + minW + 'px;flex:' + Math.max(1, segPct) + '">';
+        html += '<div class="ev-seg-line"></div>';
+        html += '<div class="ev-seg-km">' + segKm.toFixed(2) + 'km</div></div>';
+
+        html += '<div class="ev-node" onmouseenter="window.evStripHover(\'' + tipStr.replace(/'/g, '&apos;') + '\')" onmouseleave="window.evStripHover(\'\')">';
+        html += '<div class="ev-num">#' + (gi + 1) + '</div>';
+        html += '<div class="ev-icon ' + type + '">' + ICONS[type] + '</div>';
+        html += '<div class="ev-loss" style="color:' + lossCol + '">' + (Math.abs(avgLoss) > 0.01 ? avgLoss.toFixed(2) + ' ' + t('unit_dB') : '') + '</div>';
+        html += '<div class="ev-dist">' + g.dist.toFixed(3) + '</div>';
+        html += '<div style="font-size:8px">' + wlSpans + '</div>';
+        html += '</div>';
+        prevDist = g.dist;
+    });
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+export function evStripHover(tip) {
+    const el = document.getElementById('evStripInfo');
+    if (!el) return;
+    if (tip) { el.textContent = tip;
+        el.style.opacity = '1'; } else { el.textContent = t('label_legend_hover');
+        el.style.opacity = '.5'; }
+}
+window.evStripHover = evStripHover;
