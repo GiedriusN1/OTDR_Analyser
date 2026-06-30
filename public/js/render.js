@@ -199,12 +199,21 @@ export function renderComp(ok, wls) {
         return b[type] || '';
     };
     const SI = { critical: '🔴', warning: '🟡', info: '🔵' };
-    const groups = {};
+  /*  const groups = {};
     ok.forEach(s => {
         const dir = s.path.split('/').slice(0, -1).join('/') || 'failai';
         if (!groups[dir]) groups[dir] = {};
         groups[dir][Math.round(s.wavelength)] = s;
-    });
+    }); */
+	// nauja versija
+	const groups = {};
+	ok.forEach(s => {
+		let dir = s.path.split('/').slice(0, -1).join('/') || 'failai';
+		if (dir === '__picked__' || dir === '_picked_') dir = t('diag_group_default');
+		if (!groups[dir]) groups[dir] = {};
+		groups[dir][Math.round(s.wavelength)] = s;
+	});
+	
     let html = '';
     for (const [dir, byWl] of Object.entries(groups)) {
         const dWls = Object.keys(byWl).map(Number).sort();

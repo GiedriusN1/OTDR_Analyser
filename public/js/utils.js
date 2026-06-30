@@ -1,4 +1,35 @@
-// ── Utilities ──
+import { translations } from './translations.js';
+
+let currentLang = 'lt';
+
+export function setLang(lang) {
+    if (translations[lang]) currentLang = lang;
+}
+
+export function t(key, params = {}) {
+    const dict = translations[currentLang] || translations.lt;
+    let text = dict[key] || key;
+    for (const [k, v] of Object.entries(params)) {
+        text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+    }
+    return text;
+}
+
+export function applyTranslations() {
+    const elements = document.querySelectorAll('[data-i18n]');
+    elements.forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        const text = t(key);
+        if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'password' || el.type === 'search')) {
+            el.placeholder = text;
+        } else if (el.tagName === 'INPUT' && el.type === 'button') {
+            el.value = text;
+        } else {
+            el.innerHTML = text;
+        }
+    });
+}
+
 export function toast(msg, type = 'ok') {
     const wrap = document.getElementById('toastWrap');
     if (!wrap) return;

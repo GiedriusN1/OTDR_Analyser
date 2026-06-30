@@ -62,18 +62,18 @@
                 <div class="tb-section" style="min-width:200px;max-width:340px;">
                     <h2 data-i18n="label_files">SOR failai <span id="fileCount" style="color:var(--teal);font-weight:700;"></span></h2>
                     <div style="display:flex;gap:4px;">
-                        <label class="btn sm" style="cursor:pointer;" data-i18n="btn_files">
-                            <i class="ti ti-files"></i> Failai
-                            <input type="file" id="pickFiles" multiple accept=".sor,.SOR" style="display:none" />
-                        </label>
-                        <label class="btn sm" style="cursor:pointer;" data-i18n="btn_folder">
-                            <i class="ti ti-folder-open"></i> Aplankas
-                            <input type="file" id="pickDir" webkitdirectory multiple style="display:none" />
-                        </label>
-                        <button class="btn sm danger" id="btnClear" title="Išvalyti viską" style="display:none" data-i18n="btn_clear">
-                            <i class="ti ti-trash"></i>
-                        </button>
-                    </div>
+						<button class="btn sm" onclick="document.getElementById('pickFiles').click();" data-i18n="btn_files">
+							<i class="ti ti-files"></i> Failai
+						</button>
+						<button class="btn sm" onclick="document.getElementById('pickDir').click();" data-i18n="btn_folder">
+							<i class="ti ti-folder-open"></i> Aplankas
+						</button>
+						<button class="btn sm danger" id="btnClear" title="Išvalyti viską" style="display:none" data-i18n="btn_clear">
+							<i class="ti ti-trash"></i>
+						</button>
+						<input type="file" id="pickFiles" multiple accept=".sor,.SOR" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;" />
+						<input type="file" id="pickDir" webkitdirectory multiple style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;" />
+					</div>
                     <div class="file-list" id="fileList">
                         <span style="font-size:11px;color:var(--muted)" data-i18n="label_no_files">Nepasirinkta failų</span>
                     </div>

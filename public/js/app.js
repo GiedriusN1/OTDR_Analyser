@@ -1,19 +1,9 @@
-// ── Main application entry ──
 import { state, resetState } from './state.js';
-import {
-    toast,
-    setStatus,
-    setProgress,
-    guessWl,
-    t,
-    setLang,
-    applyTranslations
-} from './utils.js';
-import { translations } from './translations.js';
+import { toast, setStatus, setProgress, guessWl, t, setLang, applyTranslations } from './utils.js';
 import { parseSOR } from './parser.js';
 import { diagnoseAll } from './diagnostics.js';
 import { renderAll, renderEventStrip, evStripHover } from './render.js';
-import { drawOverlay, setupOverlay } from './chart.js';
+import { drawOverlay } from './chart.js';
 import { runAiAnalysis } from './ai.js';
 import { exportExcel, exportPdf } from './export.js';
 
@@ -32,7 +22,23 @@ const btnResetAB = document.getElementById('btnResetAB');
 const emptyMain = document.getElementById('emptyMain');
 const resultsWrap = document.getElementById('resultsWrap');
 
-// ── Language toggle ──
+/* // ── Language toggle ── senas kodas, nepersijungia po analizės
+
+langBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        langBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const lang = btn.dataset.lang;
+        setLang(lang);
+        applyTranslations();
+        if (state.parsed.length > 0) {
+            renderAll();
+        }
+    });
+});
+*/
+
+// ── Language toggle ── naujas kodas Perskaičiuoja diagnostiką su nauja kalba
 const langBtns = document.querySelectorAll('.lang-btn');
 langBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -41,19 +47,21 @@ langBtns.forEach(btn => {
         const lang = btn.dataset.lang;
         setLang(lang);
         applyTranslations();
-        // Re-render dynamic content if data exists
         if (state.parsed.length > 0) {
+            // Perskaičiuojame diagnostiką su nauja kalba
+            const ok = state.parsed.filter(p => p.ok);
+            state.diagnostics = diagnoseAll(ok);
             renderAll();
         }
     });
 });
-// Set initial language from active button
+
+
+
+// Init language
 const activeLangBtn = document.querySelector('.lang-btn.active');
-if (activeLangBtn) {
-    setLang(activeLangBtn.dataset.lang);
-} else {
-    setLang('lt');
-}
+if (activeLangBtn) setLang(activeLangBtn.dataset.lang);
+else setLang('lt');
 applyTranslations();
 
 // ── Tabs ──
@@ -75,7 +83,48 @@ btnSaveKey.addEventListener('click', () => {
         toast(t('toast_key_saved')); }
 });
 
-// ── File handling ──
+// ── UI atnaujinimo funkcijos ──
+function updateButtons() {
+    const hasFiles = state.files.length > 0;
+    if (btnAnalyze) btnAnalyze.disabled = !hasFiles;
+    if (btnClear) btnClear.style.display = hasFiles ? 'flex' : 'none';
+    if (btnExcel) btnExcel.disabled = true;  // bus įjungti po analizės
+    if (btnPdf) btnPdf.disabled = true;
+}
+
+function renderSidebar() {
+    try {
+        const files = state.files;
+        const fileCountEl = document.getElementById('fileCount');
+        const fileListEl = document.getElementById('fileList');
+        
+        if (fileCountEl) {
+            fileCountEl.textContent = files.length || '';
+        }
+        
+        if (fileListEl) {
+            if (files.length) {
+                fileListEl.innerHTML = files.map((f, i) => {
+                    const wl = guessWl(f.name);
+                    const short = f.name.replace(/\.sor$/i, '').slice(0, 22);
+                    return '<div class="file-item ' + (wl ? 'wl-' + wl : '') + '" title="' + f.name + '">' +
+                        (wl ? '<span style="font-size:9px;font-weight:700">' + wl + '</span>' : '') +
+                        '<span>' + short + '</span>' +
+                        '<i class="ti ti-x" style="font-size:9px;cursor:pointer;opacity:.6;margin-left:2px" onclick="window.removeFile(' + i + ')"></i>' +
+                        '</div>';
+                }).join('');
+            } else {
+                fileListEl.innerHTML = '<span style="font-size:11px;color:var(--muted)">' + t('label_no_files') + '</span>';
+            }
+        }
+        
+        updateButtons();
+    } catch (e) {
+        console.warn('renderSidebar klaida:', e);
+    }
+}
+
+// ── Failų pridėjimas ──
 function handleFiles(fileList) {
     const sorFiles = [...fileList].filter(f => /\.sor$/i.test(f.name));
     if (!sorFiles.length) {
@@ -87,25 +136,25 @@ function handleFiles(fileList) {
     state.files = [...state.files, ...newFiles];
     const skipped = sorFiles.length - newFiles.length;
     renderSidebar();
-    btnAnalyze.disabled = false;
     toast('Pridėta: ' + newFiles.length + ' failų' + (skipped ? ' (' + skipped + ' dublikatų praleista)' : ''));
 }
 
-pickFiles.addEventListener('change', e => { handleFiles(e.target.files); });
-pickDir.addEventListener('change', e => { handleFiles(e.target.files); });
+pickFiles.addEventListener('change', e => { handleFiles(e.target.files);
+    e.target.value = ''; });
+pickDir.addEventListener('change', e => { handleFiles(e.target.files);
+    e.target.value = ''; });
 
+// ── Išvalymas ──
 btnClear.addEventListener('click', () => {
     if (!confirm(t('toast_clear_confirm', { count: state.files.length }))) return;
     resetState();
     renderSidebar();
-    btnAnalyze.disabled = true;
-    btnExcel.disabled = true;
-    btnPdf.disabled = true;
     emptyMain.style.display = 'block';
     resultsWrap.style.display = 'none';
     toast(t('toast_cleared'));
 });
 
+// ── WDM ──
 chkWdm.addEventListener('change', e => {
     state.hasWdm = e.target.checked;
     if (state.parsed.length) {
@@ -115,29 +164,16 @@ chkWdm.addEventListener('change', e => {
     }
 });
 
-function renderSidebar() {
-    const files = state.files;
-    document.getElementById('fileCount').textContent = files.length || '';
-    btnClear.style.display = files.length ? 'flex' : 'none';
-    document.getElementById('fileList').innerHTML = files.length ?
-        files.map((f, i) => {
-            const wl = guessWl(f.name);
-            const short = f.name.replace(/\.sor$/i, '').slice(0, 22);
-            return '<div class="file-item ' + (wl ? 'wl-' + wl : '') + '" title="' + f.name + '">' +
-                (wl ? '<span style="font-size:9px;font-weight:700">' + wl + '</span>' : '') +
-                '<span>' + short + '</span>' +
-                '<i class="ti ti-x" style="font-size:9px;cursor:pointer;opacity:.6;margin-left:2px" onclick="window.removeFile(' + i + ')"></i>' +
-                '</div>';
-        }).join('') :
-        '<span style="font-size:11px;color:var(--muted)">' + t('label_no_files') + '</span>';
-}
+// ── Pašalinti failą (globali funkcija) ──
 window.removeFile = (idx) => {
     state.files.splice(idx, 1);
     renderSidebar();
-    if (!state.files.length) btnAnalyze.disabled = true;
+    if (!state.files.length) {
+        btnAnalyze.disabled = true;
+    }
 };
 
-// ── Analyze ──
+// ── Analizė ──
 btnAnalyze.addEventListener('click', async () => {
     btnAnalyze.disabled = true;
     btnAnalyze.innerHTML = '<span class="spinner"></span> ' + t('btn_analyzing');
@@ -156,7 +192,9 @@ btnAnalyze.addEventListener('click', async () => {
             setProgress(10 + 70 * (i + 1) / state.files.length);
         }
         const ok = parsed.filter(p => p.ok);
-        if (!ok.length) { toast(t('toast_analyze_error'), 'err'); return; }
+        if (!ok.length) { toast(t('toast_analyze_error'), 'err');
+            btnAnalyze.disabled = false;
+            btnAnalyze.innerHTML = '<i class="ti ti-search"></i> ' + t('btn_analyze'); return; }
         setProgress(85);
         setStatus(t('status_diagnosing'));
         state.parsed = parsed;
@@ -185,13 +223,12 @@ btnExcel.addEventListener('click', exportExcel);
 btnPdf.addEventListener('click', exportPdf);
 
 // ── AI ──
-// Language buttons for AI are already handled by the generic .lang-btn above.
 btnAiAnalyze.addEventListener('click', runAiAnalysis);
 
 // ── Reset A/B ──
 btnResetAB.addEventListener('click', () => {
     state.markerA = 0.08;
-    state.markerB = 0.5;
+    state.markerB = 0.92;
     drawOverlay();
 });
 

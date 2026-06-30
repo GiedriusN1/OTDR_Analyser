@@ -261,7 +261,12 @@ export function calcQuality(diags) {
 export function diagnoseAll(sors) {
     const groups = {};
     sors.forEach(s => {
-        const dir = s.path.split('/').slice(0, -1).join('/') || 'failai';
+        // const dir = s.path.split('/').slice(0, -1).join('/') || 'failai';
+		// naujos 2 eilutės žemiau
+		let dir = s.path.split('/').slice(0, -1).join('/') || 'failai';
+if 		(dir === '__picked__' || dir === '_picked_') dir = t('diag_overall_status');
+		
+		
         if (!groups[dir]) groups[dir] = {};
         groups[dir][Math.round(s.wavelength)] = s;
     });
