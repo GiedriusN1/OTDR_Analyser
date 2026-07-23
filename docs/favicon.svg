@@ -1,0 +1,21 @@
+<svg xmlns="http://w3.org" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Šviesiai žalias fonas su švelniai užapvalintais kampais -->
+  <rect width="512" height="512" rx="80" fill="#39FF14"/>
+  
+  <!-- Juodos, labai storos raidės dviem eilutėmis -->
+  <text x="256" y="210" 
+        font-family="Arial, Helvetica, sans-serif" 
+        font-size="190" 
+        font-weight="900" 
+        fill="#000000" 
+        text-anchor="middle" 
+        dominant-baseline="central">OT</text>
+        
+  <text x="256" y="380" 
+        font-family="Arial, Helvetica, sans-serif" 
+        font-size="190" 
+        font-weight="900" 
+        fill="#000000" 
+        text-anchor="middle" 
+        dominant-baseline="central">DR</text>
+</svg>
