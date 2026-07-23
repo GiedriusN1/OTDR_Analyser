@@ -95,49 +95,54 @@ function averagingCheck(sor) {
     return { id: 'averaging', pass: true, title: 'Tinkamas vidurkinimas' };
 }
 
+// SVARBU: ar launch kabelis (dirbtinė linija) buvo naudotas, sprendžiama
+// TIK iš dviejų dalykų - vartotojo varnelės (has1kmLine) ir/arba reflektyvaus
+// event'o ties ~1 km. Prijungimo dead zone DYDIS (dešimtys metrų) yra visiškai
+// KITOS eilės dydis (~1000 m launch linijai) ir NIEKO nesako apie tai, ar
+// launch kabelis buvo naudotas - jis priklauso VIEN nuo impulso pločio ir
+// OTDR/jungties švarumo, identiškai abiem atvejais. Todėl ši patikra
+// NIEKADA nespėlioja apie launch kabelio (ne)naudojimą - tai jau ŽINOMA iš
+// has1kmLine parametro. Ji tikrina VISAI KITĄ dalyką: ar trasos PRADŽIOJE
+// (0-X m) esantis aklas plotas atitinka vien impulso fiziką, ar yra didesnis
+// (tikėtina dėl nešvarios/pažeistos OTDR prievado ar pirmos jungties).
 function launchCheck(sor, has1kmLine) {
     const artifactM = sor.launch_artifact_m || 0;
     const pulseNs = sor.pulse_width || 0;
     const ior = sor.ior || 1.4676;
     // Ta pati formulė kaip utils.js detectLaunchArtifactEnd() - fizikai pagrįsta
     // minimali atsigavimo zona VIEN dėl impulso pločio, be jokio papildomo trukdžio.
-    // Ilgesnis impulsas natūraliai reikalauja ilgesnio atsigavimo - lyginame su ŠIA
-    // riba, o ne su fiksuotu skaičiumi, kitaip ilgus impulsus klaidingai pažymėtume.
     const cOver2n = (299792.458 / (2 * ior)) * 1e-9;
     const edzKm = pulseNs * cOver2n;
     const formulaFloorM = Math.max(10, edzKm * 8 * 1000) * 0.8;
 
-    // Jei naudojama 1 km dirbtinė (launch) linija, ji pati yra ~1000 m buferis
-    // prijungimo artefaktui nuslopinti - kol artefaktas telpa į šį buferį,
-    // "nenaudoto launch kabelio" perspėjimas neteisingas (launch_artifact_m čia
-    // aprašo artefaktą PRIEŠ korekciją, t.y. pačioje dirbtinėje linijoje, o ne
-    // realioje matuojamoje linijoje).
+    // Jei naudojama 1 km dirbtinė (launch) linija (varnelė uždėta), ji pati
+    // yra ~1000 m buferis - kol artefaktas telpa į šį buferį, jis apskritai
+    // nepasiekia realios matuojamos linijos, tad nesvarbu koks jo dydis.
     if (has1kmLine && artifactM <= 1000) {
-        return { id: 'launch', pass: true, title: 'Prijungimo dead zone dydis priimtinas (dirbtinė 1 km linija naudojama)' };
+        return { id: 'front_dead_zone', pass: true, title: 'Trasos pradžios akla zona nekliudo realiai linijai (dirbtinė 1 km linija ją absorbuoja)' };
     }
 
-    // SVARBU: ši patikra NIEKADA negali įrodyti, kad launch kabelis TIKRAI
-    // buvo naudotas - mažas atsigavimo artefaktas vienodai atitinka ir "launch
-    // kabelis naudotas", ir "launch kabelio nebuvo, bet OTDR jungtis buvo
-    // švari". Todėl PASS atveju pavadinimas aprašo tik tai, ką iš tikrųjų
-    // matuojame - artefakto dydį, ne prielaidą apie tai, KAIP buvo matuota.
-    // Anksčiau čia buvo papildomas fiksuotas "&& artifactM > 100" slenkstis,
-    // kuris trumpiems impulsams (mažas formulaFloorM) visiškai užmaskuodavo
-    // reikšmingą santykinį perviršį (pvz. 54 m vs ~33 m fizikos riba pagal
-    // 50 ns impulsą - 65% daugiau, bet niekada nepasiekdavo 100 m slenksčio).
     const absoluteFloorM = Math.max(20, formulaFloorM * 0.5);
     if (artifactM > formulaFloorM * 1.5 && artifactM > absoluteFloorM) {
+        // has1kmLine === false čia (aukščiau esanti šaka jau apdorojo true
+        // atvejį) - t.y. TIKRAI ŽINOME, kad launch kabelis nenaudotas, tad
+        // šis aklas plotas TIESIOGIAI dengia realios linijos pradžią.
+        const overlapNote = has1kmLine
+            ? 'Kadangi dirbtinė linija naudojama, šis plotas realios linijos nepasiekia, bet toks papildomas atsigavimas gali reikšti nešvarų prijungimą.'
+            : 'Kadangi launch kabelis/dirbtinė linija NEnaudojama (varnelė nuimta), šis aklas plotas TIESIOGIAI dengia jūsų realios linijos pirmuosius ' + artifactM + ' m - tie metrai neišmatuoti.';
         return {
-            id: 'launch',
+            id: 'front_dead_zone',
             pass: false,
             severity: 'warning',
             weight: 12,
-            title: 'Prijungimo dead zone didesnė nei tikėtasi šiam impulsui',
-            detail: 'OTDR prijungimo artefaktas užima ' + artifactM + ' m - tai gerokai daugiau nei ' + Math.round(formulaFloorM) + ' m, kurių reikalautų vien ' + pulseNs + ' ns impulso fizika. Tai NEBŪTINAI reiškia, kad launch kabelis nenaudotas - taip pat gali rodyti nešvarų/atvirą OTDR portą net ir su launch kabeliu.',
-            advice: 'Jei launch kabelis nenaudojamas - naudokite jį prieš matuojamą liniją. Jei jau naudojamas - patikrinkite OTDR ir launch kabelio jungčių švarumą.'
+            title: 'Trasos pradžios akla zona didesnė nei tikėtasi šiam impulsui',
+            detail: 'OTDR prijungimo artefaktas užima ' + artifactM + ' m - tai gerokai daugiau nei ' + Math.round(formulaFloorM) + ' m, kurių reikalautų vien ' + pulseNs + ' ns impulso fizika. ' + overlapNote,
+            advice: has1kmLine
+                ? 'Patikrinkite OTDR ir dirbtinės linijos jungčių švarumą.'
+                : 'Patikrinkite/nuvalykite OTDR prievado ir pirmos jungties švarumą. Jei norite, kad ši akla zona nesiedintų su realios linijos matavimu, kitą kartą naudokite dirbtinę (launch) liniją prieš matuojamą liniją ir pažymėkite atitinkamą varnelę.'
         };
     }
-    return { id: 'launch', pass: true, title: 'Prijungimo dead zone dydis priimtinas' };
+    return { id: 'front_dead_zone', pass: true, title: 'Trasos pradžios aklos zonos dydis priimtinas' };
 }
 
 function saturationCheck(sor) {
