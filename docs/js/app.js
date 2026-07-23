@@ -10,6 +10,7 @@ import { exportExcel, exportPdf } from './export.js';
 // ── DOM refs ──
 const pickFiles = document.getElementById('pickFiles');
 const pickDir = document.getElementById('pickDir');
+const btnPickDir = document.getElementById('btnPickDir');
 const btnClear = document.getElementById('btnClear');
 const btnAnalyze = document.getElementById('btnAnalyze');
 const btnExcel = document.getElementById('btnExcel');
@@ -179,6 +180,53 @@ pickFiles.addEventListener('change', e => { handleFiles(e.target.files);
 pickDir.addEventListener('change', e => { handleFiles(e.target.files);
     e.target.value = ''; });
 
+// ── Aplanko pasirinkimas per File System Access API (Chrome/Edge) ──
+// Skirtingai nuo <input webkitdirectory>, showDirectoryPicker() grąžina TIKRĄ
+// aplanko rankeną, kurią vėliau galime naudoti .notes.json failams įrašyti
+// TIESIOGIAI šalia atitinkamo .sor failo - be atsisiuntimo į Downloads ir be
+// atskiro "Išsaugoti kaip" dialogo kiekvienam failui. mode:'readwrite' iškart
+// paprašo rašymo teisės, kad vėliau (eksportuojant pastabas) nereikėtų antro
+// leidimo klausimo. Nepalaikančiose naršyklėse (Firefox/Safari) tiesiog
+// grįžtame prie senojo <input webkitdirectory> būdo.
+async function collectDirFiles(dirHandle, prefix = '') {
+    const files = [];
+    for await (const [name, handle] of dirHandle.entries()) {
+        const relPath = prefix ? prefix + '/' + name : name;
+        if (handle.kind === 'directory') {
+            files.push(...await collectDirFiles(handle, relPath));
+        } else if (/\.(sor|json)$/i.test(name)) {
+            const file = await handle.getFile();
+            file._relPath = relPath;
+            state.fileDirHandles.set(relPath, dirHandle);
+            files.push(file);
+        }
+    }
+    return files;
+}
+
+if (btnPickDir) {
+    btnPickDir.addEventListener('click', async () => {
+        if ('showDirectoryPicker' in window) {
+            try {
+                const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                const files = await collectDirFiles(dirHandle);
+                if (!files.length) {
+                    toast('Pasirinktame aplanke nerasta .sor failų', 'err');
+                    return;
+                }
+                state.sorDirHandle = dirHandle;
+                handleFiles(files);
+            } catch (e) {
+                if (e.name === 'AbortError') return; // vartotojas atšaukė pasirinkimą
+                console.warn('showDirectoryPicker klaida, grįžtama prie standartinio aplanko pasirinkimo:', e.message);
+                pickDir.click();
+            }
+            return;
+        }
+        pickDir.click();
+    });
+}
+
 // ── Išvalymas ──
 btnClear.addEventListener('click', () => {
     if (!confirm(t('toast_clear_confirm', { count: state.files.length }))) return;
@@ -243,7 +291,7 @@ btnAnalyze.addEventListener('click', async () => {
                 const buf = await f.arrayBuffer();
                 // Naudojame setTimeout, kad atlaisvintume UI giją
                 await new Promise(resolve => setTimeout(resolve, 0));
-                parsed.push(parseSOR(buf, f.name, f.webkitRelativePath || f.name));
+                parsed.push(parseSOR(buf, f.name, f._relPath || f.webkitRelativePath || f.name));
             } catch (e) {
                 parsed.push({ ok: false, file: f.name, error: e.message });
             }
@@ -324,8 +372,14 @@ btnNotes.addEventListener('click', async () => {
                 return a;
             });
         if (!annotations.length) return;
+        // sor.path yra '__picked__/' + relPath (žr. parser.js) - relPath yra
+        // TAS PATS raktas, kurį collectDirFiles() naudojo state.fileDirHandles
+        // žemėlapyje, tad iš jo galime rasti TIKSLŲ paaplankį, kuriame yra šis
+        // .sor failas (net jei aplankas su pomapėmis - pvz. "Piliuona matavimai/").
+        const relPath = (sor.path || '').startsWith('__picked__/') ? sor.path.slice('__picked__/'.length) : sor.file;
         toExport.push({
             filename: sor.file.replace(/\.sor$/i, '') + '.notes.json',
+            dirHandle: state.fileDirHandles.get(relPath) || null,
             payload: { sourceFile: sor.file, exportedAt: new Date().toISOString(), annotations }
         });
     });
@@ -333,13 +387,29 @@ btnNotes.addEventListener('click', async () => {
         toast('Nėra jokių perrašymų ar pastabų eksportui', 'err');
         return;
     }
-    // showSaveFilePicker (Chrome/Edge) leidžia pačiam vartotojui pele nurodyti
-    // tikslią vietą (pvz. tą patį aplanką kaip .sor failai) - <a download> visada
-    // meta į numatytą Atsisiuntimų aplanką, be galimybės to pakeisti iš scenarijaus.
+    // Pirmenybė: 1) tikslus paaplankis, kuriame yra šis .sor failas (jei
+    // pasirinkta per "Aplankas" / showDirectoryPicker) - įrašoma TIESIOGIAI,
+    // be jokio dialogo. 2) showSaveFilePicker (Chrome/Edge) - vartotojas pats
+    // nurodo vietą pele. 3) <a download> - visada meta į Atsisiuntimus, be
+    // galimybės to pakeisti iš scenarijaus (paskutinis atsarginis variantas).
     const supportsPicker = 'showSaveFilePicker' in window;
     let savedCount = 0;
+    let savedDirectly = 0;
     for (const item of toExport) {
         const text = JSON.stringify(item.payload, null, 2);
+        if (item.dirHandle) {
+            try {
+                const fileHandle = await item.dirHandle.getFileHandle(item.filename, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(text);
+                await writable.close();
+                savedCount++;
+                savedDirectly++;
+                continue;
+            } catch (e) {
+                console.warn('Nepavyko įrašyti tiesiai į pasirinktą aplanką (' + item.filename + '), bandoma showSaveFilePicker:', e.message);
+            }
+        }
         if (supportsPicker) {
             try {
                 const handle = await window.showSaveFilePicker({
@@ -368,7 +438,8 @@ btnNotes.addEventListener('click', async () => {
         savedCount++;
     }
     if (savedCount) {
-        toast('Išsaugota pastabų failų: ' + savedCount);
+        toast('Išsaugota pastabų failų: ' + savedCount +
+            (savedDirectly ? ' (' + savedDirectly + ' tiesiai šalia .sor failo, be dialogo)' : ''));
     } else {
         toast('Nėra jokių perrašymų ar pastabų eksportui', 'err');
     }

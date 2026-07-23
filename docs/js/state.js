@@ -10,6 +10,11 @@ export const state = {
     aiLang: 'lt',
     markerA: 0.08,
     markerB: 0.5,
+    // File System Access API (Chrome/Edge): pasirinkto aplanko rankena, kad
+    // .notes.json failus galėtume rašyti TIESIOGIAI šalia .sor failų, be
+    // atsisiuntimo į Downloads ir be pakartotinio "Išsaugoti kaip" dialogo.
+    sorDirHandle: null,
+    fileDirHandles: new Map(), // relPath -> jį saugančio paaplankio rankena
 };
 
 // Helper to reset state (if needed)
@@ -24,5 +29,7 @@ export function resetState() {
     state.aiLang = 'lt';
     state.markerA = 0.08;
     state.markerB = 0.92;
+    state.sorDirHandle = null;
+    state.fileDirHandles = new Map();
 }
 
