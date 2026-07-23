@@ -267,8 +267,26 @@ export function annotateNoiseZoneEvents(sors) {
         if (!onset) return;
         const affectedEvents = (sor.events || []).filter(e => e.distance > onset.x);
         if (!affectedEvents.length) return;
-        const indices = affectedEvents.map(e => '#' + e.index).join(', ');
-        const nearBoundary = affectedEvents.filter(e => e.distance - onset.x < 0.3);
+
+        // Ar VIENINTELIS "paveiktas" event'as yra pats deklaruotas tikras
+        // galas ('E' tipo žyma)? Tai VISIŠKAI normalu ir tikėtasi (signalas
+        // negrįžta iš linijos pabaigos - triukšmas iš karto po jos yra
+        // fizikos dėsnis, ne anomalija) - tokiu atveju nereikia sunkiasvorio,
+        // hedge'inančio pranešimo apie "tikėtinai NE realius event'us", nes
+        // vienintelis event'as čia YRA realus, ir mes tai TIKRAI žinome (žr.
+        // tą pačią 0.3 km ribą diagnostics.js/measurement-quality.js). Diags
+        // apie patį galą jau rodomi kitur (diagnoseSingle "✅ Linijos galas
+        // patvirtintas") - čia tiesiog praleidžiame, kad neliktų prieštaringų
+        // pranešimų per daug garbės skiriant paprastam linijos galui.
+        const declaredEnd = (sor.events || []).find(e => e.typeStr && e.typeStr.length > 1 && e.typeStr[1] === 'E');
+        const onsetConfirmsRealEnd = declaredEnd && Math.abs(onset.x - declaredEnd.distance) <= 0.3;
+        const otherEvents = onsetConfirmsRealEnd
+            ? affectedEvents.filter(e => e !== declaredEnd)
+            : affectedEvents;
+        if (!otherEvents.length) return;
+
+        const indices = otherEvents.map(e => '#' + e.index).join(', ');
+        const nearBoundary = otherEvents.filter(e => e.distance - onset.x < 0.3);
         const boundaryNote = nearBoundary.length
             ? ' Atkreipkite dėmesį: ' + nearBoundary.map(e => '#' + e.index).join(', ') +
               ' yra arti pačios ribos (< 300m) - jei tai atitinka žinomo įtaiso (pvz. WDM) parašą, tikėtina, kad tai VIS DAR paskutinis realus trasos elementas, o ne triukšmas; vertinkite individualiai.'
