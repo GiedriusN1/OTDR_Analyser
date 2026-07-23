@@ -16,7 +16,7 @@ export function theoreticalMaxReflectionDb(ior) {
 // atstumų matematiką (2×d arba d1+d2 nuo žinomų stiprių atspindžių) IR
 // numatomo ghost stiprumo atitikimą, o ne vien vieną absoliutų kriterijų.
 export function detectGhostReflections(sors, opts = {}) {
-    const tolerance = opts.distanceToleranceKm ?? 0.02;
+    const baseTolerance = opts.distanceToleranceKm ?? 0.02;
     const strongReflDb = opts.strongReflectorDb ?? -35; // "stiprus" atspindys = potencialus ghost šaltinis
     const diags = [];
 
@@ -66,6 +66,13 @@ export function detectGhostReflections(sors, opts = {}) {
             // SVARBU: kandidatai negali sutapti su pačiu ev (pagal ATSTUMĄ, ne
             // objekto nuorodą) - kitaip labai arti nulio esantis stiprus
             // atspindys trivialiai "atitinka" beveik bet kurį eventą (0+X≈X).
+            // Tolerancija SKALUOJASI su atstumu - fiksuota 20 m riba pagavo
+            // trumpo nuotolio ghost'us, bet ilgo nuotolio dvigubo atspindžio
+            // ghost'ai (pvz. ~9.5 km, dviguba ~4.77 km linija) realiuose
+            // failuose (ODF-72 sk.3) rodė ~24-27 m nuokrypį nuo tikslaus 2×d -
+            // kalibravimo/atstumo skaičiavimo paklaida natūraliai auga su
+            // nuėjusiu keliu, tad fiksuota mažo atstumo riba jį praleisdavo.
+            const tolerance = Math.max(baseTolerance, ev.distance * 0.003);
             let bestMatch = null;
             const distTol = 1e-6;
             strong.forEach(s1 => {

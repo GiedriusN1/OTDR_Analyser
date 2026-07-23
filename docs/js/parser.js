@@ -435,7 +435,19 @@ if (traceData.length > 10) {
         // prasme (ymax etalonas dažnai būna kaip tik šiame atspindyje), todėl
         // vidutinis slopinimas būdavo smarkiai per didelis (klaidingai rodydavo
         // kelis kartus daugiau nei iš tišro yra).
-        const lastEventDist = events.length ? events[events.length - 1].distance : null;
+        // SVARBU: jei prietaisas PATS aiškiai deklaravo galą ('E' tipo žyma),
+        // naudojame BŪTENT JĮ, o NE paskutinį masyvo elementą - kai kuriuose
+        // realiuose failuose po deklaruoto 'E' galo dar būna vienas ar keli
+        // TOLESNI "event'ai", kurie iš tikrųjų yra tik triukšmo pikai
+        // (žr. trasos y reikšmes tarp jų - jos šuoliuoja chaotiškai, ne
+        // mažėja nuosekliai). Naudojant tokį triukšmo "event'ą" kaip ribą,
+        // vidutinis slopinimas skaičiuojamas per zoną, kuri iš dalies ar
+        // visiškai patenka į triukšmą - tai duoda absurdiškai dideles
+        // (dešimtys dB/km) reikšmes. Patikrinta su ODF-72 sk.66 failais.
+        const declaredEndEvent = events.find(e => e.typeStr && e.typeStr.length > 1 && e.typeStr[1] === 'E');
+        const lastEventDist = declaredEndEvent
+            ? declaredEndEvent.distance
+            : (events.length ? events[events.length - 1].distance : null);
         let endLimitKm;
         if (lastEventDist && lastEventDist > launchArtifactEndKm + 0.1) {
             endLimitKm = lastEventDist - 0.05; // 50 m saugos riba prieš paskutinį įvykį

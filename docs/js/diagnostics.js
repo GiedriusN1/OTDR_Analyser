@@ -8,18 +8,30 @@ import { detectNoiseOnset } from './advanced-diagnostics.js';
 // ══════════════════════════════════════════════════════════════
 
 function isRealEndOfFiber(ev, events, rangeKm) {
-    const maxDist = Math.max(...events.map(e => e.distance));
-    if (ev.distance < maxDist - 0.01) return false;
-
     // SVARBI PATAISA: jei PATS PRIETAISAS savo Bellcore tipo žymoje ("0E...")
     // pažymėjo šį event'ą kaip linijos galą, tai autoritetingas signalas -
-    // priimame jį NEPRIKLAUSOMAI nuo |loss| patikros žemiau. Be šito
-      // patologiniuose failuose (kur po didelio pažeidimo prietaisas pats
-    // "pasiduoda" ir apskaičiuoja absurdišką loss reikšmę savo pačio galo
-    // žymai) event'as klaidingai patekdavo į suvirinimo/"gainer" klasifikaciją.
+    // priimame jį NEPRIKLAUSOMAI nuo |loss| patikros žemiau IR nepriklausomai
+    // nuo to, ar tai chronologiškai PASKUTINIS event'as masyve. Kai kuriuose
+    // realiuose failuose (pvz. ODF-72 sk.3) po tikro deklaruoto 'E' galo dar
+    // būna 1 papildomas "event'as" toliau - dvigubo atspindžio ghost'as (žr.
+    // detectGhostReflections) - kurį prietaisas irgi užregistravo. Ankstesnė
+    // versija PIRMA tikrino "ar tai paskutinis/toliausiai esantis event'as",
+    // o TIK TADA - ar jis pažymėtas 'E' - todėl toks ghost'as (esantis TOLIAU
+    // už tikrą 'E' galą) laimėdavo šią patikrą per savo atspindžio dydį
+    // atitinkančias euristikas (isBorder ir pan.), o tikras 'E' galas,
+    // nebebūdamas paskutinis, buvo atmetamas kaip "ne galas" vien dėl savo
+    // pozicijos masyve. Todėl 'E' žymos patikra dabar visada PIRMA.
     if (ev.typeStr && ev.typeStr.length > 1 && ev.typeStr[1] === 'E') {
         return true;
     }
+    // Jei KITAS event'as šiame faile jau turi eksplicitinę 'E' žymą, ŠIS
+    // (be 'E' žymos) tikrai NĖRA galas - nesvarbu, kokia jo pozicija ar
+    // atspindžio dydis (žr. aukščiau esantį paaiškinimą).
+    const hasDeclaredEnd = events.some(e => e.typeStr && e.typeStr.length > 1 && e.typeStr[1] === 'E');
+    if (hasDeclaredEnd) return false;
+
+    const maxDist = Math.max(...events.map(e => e.distance));
+    if (ev.distance < maxDist - 0.01) return false;
 
     if (Math.abs(ev.loss) > 0.05) return false;
 
@@ -340,7 +352,16 @@ function _findEndDistance(sor) {
     const events = sor.events || [];
     const rangeKm = sor.range_km || 0;
     if (!events.length) return rangeKm * 0.9;
-    const last = events[events.length - 1];
+    // Jei prietaisas PATS deklaravo galą ('E' tipo žyma), pasitikime BŪTENT
+    // JUO, o ne masyvo paskutiniu elementu - kai kuriuose realiuose failuose
+    // po deklaruoto 'E' galo dar būna 1-2 papildomi "event'ai", kurie iš
+    // tikrųjų yra tik triukšmo pikai (trasos y reikšmės tarp jų šuoliuoja
+    // chaotiškai, ne mažėja nuosekliai). Naudojant tokį triukšmo "event'ą"
+    // kaip segmentų analizės galą, gaunami absurdiški "kritiniai pažeidimai"
+    // zonose, kurios iš tikrųjų yra triukšmas po tikro galo, ne kabelis.
+    // Patikrinta su ODF-72 sk.66 failais.
+    const declaredEnd = events.find(e => e.typeStr && e.typeStr.length > 1 && e.typeStr[1] === 'E');
+    const last = declaredEnd || events[events.length - 1];
     if (Math.abs(last.loss) < 0.01) return last.distance;
     const trace = sor.trace;
     if (trace && trace.length > 10) {
