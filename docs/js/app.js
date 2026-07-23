@@ -355,8 +355,25 @@ btnAnalyze.addEventListener('click', async () => {
                     const data = JSON.parse(txt);
                     const sor = parsed.find(p => p.ok && p.file === data.sourceFile);
                     if (sor && Array.isArray(data.annotations)) {
+                        // Pirmenybė: originalDistance (fizinis atstumas) - stabilus
+                        // net jei parsavimo/klasifikavimo kodas pasikeitė ir dėl to
+                        // pasikeitė aptiktų event'ų kiekis/sąrašas tame pačiame
+                        // faile (patvirtinta realiu atveju - žr. commit istoriją).
+                        // Atsarginis variantas index - senų .notes.json failų,
+                        // išsaugotų prieš originalDistance lauko pridėjimą, atveju.
+                        const DIST_TOLERANCE_KM = 0.005;
                         data.annotations.forEach(a => {
-                            const ev = sor.events.find(e => e.index === a.index);
+                            let ev = null;
+                            if (typeof a.originalDistance === 'number') {
+                                let bestDiff = DIST_TOLERANCE_KM;
+                                for (const e of sor.events) {
+                                    const diff = Math.abs(e.originalDistance - a.originalDistance);
+                                    if (diff <= bestDiff) { bestDiff = diff; ev = e; }
+                                }
+                            }
+                            if (!ev) {
+                                ev = sor.events.find(e => e.index === a.index);
+                            }
                             if (ev) {
                                 if (a.overrideType) ev._overrideType = a.overrideType;
                                 if (a.comment) ev._userComment = a.comment;
@@ -401,7 +418,13 @@ btnNotes.addEventListener('click', async () => {
         const annotations = (sor.events || [])
             .filter(e => e._overrideType || e._userComment)
             .map(e => {
-                const a = { index: e.index };
+                // originalDistance (nekoreguotas fizinis atstumas nuo SOR failo) yra
+                // stabilesnis identifikatorius nei index - jis nepriklauso nuo
+                // parsavimo/klasifikavimo kodo pakeitimų, kurie gali pakeisti, kiek
+                // event'ų iš viso aptinkama tame pačiame faile. index paliekamas
+                // kaip atsarginis atpažinimo būdas SENIEMS .notes.json failams,
+                // išsaugotiems prieš šį pakeitimą (žr. importo pusę btnAnalyze'e).
+                const a = { index: e.index, originalDistance: e.originalDistance };
                 if (e._overrideType) a.overrideType = e._overrideType;
                 if (e._userComment) a.comment = e._userComment;
                 return a;

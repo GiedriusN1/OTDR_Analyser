@@ -2,8 +2,13 @@ import { state } from './state.js';
 import { WL_COLORS } from './config.js';
 import { t, apply1kmCorrection, filterEvents, formatWavelength, getClosestStandardWavelength } from './utils.js';
 import { classifyEvent, consolidateEvents } from './diagnostics.js';
+import { detectGhostReflections } from './advanced-diagnostics.js';
 
 let traceChartInstance = null;
+// Ghost žymeklių aktyvios "hit" zonos paskutiniame drawOverlay() piešime -
+// naudojama pelės užvedimo tooltip'ui (žr. setupOverlay). Perrašoma kiekvieną
+// kartą perpiešiant, kad visada atspindėtų DABARTINES ekrano koordinates.
+let ghostHitRegions = [];
 
 export function getTraceChart() {
     return traceChartInstance;
@@ -120,20 +125,49 @@ export function drawOverlay() {
     // ── 5. Konsoliduojame eventus ──
     const groups = consolidateEvents(filteredSors);
 
+    // ── 5b. Ghost'ų aptikimas - žymime grafike, ne tik Diagnostikos tabe ──
+    // Raktas file+atstumas (tiksliai tas pats _distance, kurį pati
+    // detectGhostReflections() nustatė iš ev.distance), kad rastume, KURIE iš
+    // konsoliduotos grupės event'ų yra ghost kandidatai, ir kokiu pasitikėjimu.
+    const ghostDiags = detectGhostReflections(filteredSors);
+    const ghostByKey = new Map();
+    ghostDiags.forEach(d => {
+        const key = d._file + '|' + d._distance.toFixed(4);
+        const prev = ghostByKey.get(key);
+        if (!prev || d._confidence > prev.confidence) {
+            ghostByKey.set(key, { confidence: d._confidence, msg: d.msg, sev: d.sev });
+        }
+    });
+
     // ── 6. Piešiame markerius ──
     const TYPE_COLORS = { splice: '#00d4aa', refl: '#f7884f', end: '#e05c5c', wdm: '#4f8ef7', other: '#7a8099' };
+    const GHOST_COLOR = '#8a8f9e';
+    ghostHitRegions = [];
 
     groups.forEach((g, gi, arr) => {
         const px = xAxis.getPixelForValue(g.dist);
         if (px < xAxis.left - 2 || px > xAxis.right + 2) return;
         const mainType = g.events[0] ? classifyEvent(g.events[0]) : 'other';
-        const col = TYPE_COLORS[mainType] || '#7a8099';
 
-        // Vertikali linija
+        // Ar bent vienas šios grupės event'as (bet kurios bangos) yra ghost
+        // kandidatas? Imame DIDŽIAUSIĄ pasitikėjimą, jei sutampa keli.
+        let ghostInfo = null;
+        for (const e of g.events) {
+            const gh = ghostByKey.get(e.file + '|' + e.distance.toFixed(4));
+            if (gh && (!ghostInfo || gh.confidence > ghostInfo.confidence)) ghostInfo = gh;
+        }
+        const isStrongGhost = !!ghostInfo && ghostInfo.confidence >= 70;
+        const isWeakGhost = !!ghostInfo && !isStrongGhost;
+        const col = isStrongGhost ? GHOST_COLOR : (TYPE_COLORS[mainType] || '#7a8099');
+
+        // Vertikali linija - ghost kandidatams brūkšninė, o stipraus
+        // pasitikėjimo ghost'ams (≥70%) dar ir pritemdyta, kad akis iškart
+        // matytų, jog tai tikėtinai NE realus fizinis įvykis.
         ctx.save();
         ctx.strokeStyle = col;
         ctx.lineWidth = 1;
-        ctx.setLineDash([]);
+        ctx.globalAlpha = isStrongGhost ? 0.45 : 1;
+        ctx.setLineDash(ghostInfo ? [5, 4] : []);
         ctx.beginPath();
         ctx.moveTo(px, yT);
         ctx.lineTo(px, yB);
@@ -142,11 +176,12 @@ export function drawOverlay() {
 
         // Žymeklis su numeriu - kas antras (gi nelyginis) žemiau pastumtas,
         // kad artimi vienas šalia kito event'ai nebesusiliestų/nepersidengtų.
-        const bW = 18,
+        const bW = ghostInfo ? 26 : 18,
             bH = 15,
             rowOffset = (gi % 2 === 1) ? (bH + 23) : 0,
             bY = yT + 3 + rowOffset;
         ctx.save();
+        ctx.globalAlpha = isStrongGhost ? 0.55 : 1;
         ctx.fillStyle = col;
         ctx.beginPath();
         ctx.moveTo(px - bW / 2 + 3, bY);
@@ -161,6 +196,17 @@ export function drawOverlay() {
         ctx.closePath();
         ctx.fill();
 
+        // Neaiškaus (30-70%) ghost kandidato plona brūkšninė kontūro linija -
+        // silpnesnis vizualinis signalas nei pilnas pritemdymas, nes čia
+        // pasitikėjimas mažesnis (gali būti ir realus, nedokumentuotas defektas).
+        if (isWeakGhost) {
+            ctx.setLineDash([2, 2]);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
         // Trikampėliai apačioje
         ctx.beginPath();
         ctx.moveTo(px - 4, bY + bH);
@@ -172,8 +218,12 @@ export function drawOverlay() {
         ctx.font = 'bold 10px Inter,sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(gi + 1, px, bY + bH / 2);
+        ctx.fillText(ghostInfo ? '👻' + (gi + 1) : (gi + 1), px, bY + bH / 2);
         ctx.restore();
+
+        if (ghostInfo) {
+            ghostHitRegions.push({ x0: px - bW / 2, x1: px + bW / 2, y0: bY, y1: bY + bH + 4, msg: ghostInfo.msg, confidence: ghostInfo.confidence });
+        }
 
         // Nuostolio tekstas
         const avgLoss = g.events.reduce((s, e) => s + e.loss, 0) / g.events.length;
@@ -202,6 +252,18 @@ export function drawOverlay() {
         ctx.textBaseline = 'top';
         ctx.fillText(g.dist.toFixed(3) + ' ' + t('unit_km'), px + 3, bY + bH + 16);
         ctx.shadowBlur = 0;
+
+        // Ghost pasitikėjimo % (paaiškinimą žr. pelės tooltip'e ties žymekliu)
+        if (ghostInfo) {
+            ctx.shadowColor = 'rgba(0,0,0,0.9)';
+            ctx.shadowBlur = 4;
+            ctx.font = 'bold 8px JetBrains Mono,monospace';
+            ctx.fillStyle = GHOST_COLOR;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText('👻 ' + ghostInfo.confidence + '%', px + 3, bY + bH + 27);
+            ctx.shadowBlur = 0;
+        }
         if (gi > 0) {
             const prevDist = arr[gi - 1].dist;
             const segLength = g.dist - prevDist;
@@ -337,6 +399,15 @@ export function setupOverlay(ok) {
 
     ov.addEventListener('mousemove', e => {
         ov.style.cursor = nearMarker(e) ? 'ew-resize' : 'crosshair';
+        if (!dragging) {
+            // Ghost žymeklio tooltip - native "title" atributas, nes žymekliai
+            // piešiami raw canvas'e (ne DOM elementai), tad hover'ą turime
+            // patikrinti patys pagal paskutinio drawOverlay() įrašytas zonas.
+            const rect = ov.getBoundingClientRect();
+            const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+            const hit = ghostHitRegions.find(r => mx >= r.x0 && mx <= r.x1 && my >= r.y0 && my <= r.y1);
+            ov.title = hit ? ('👻 ' + hit.confidence + '% - ' + hit.msg) : '';
+        }
         if (!dragging) return;
         const f = fracFromEvent(e);
         if (f === null) return;
