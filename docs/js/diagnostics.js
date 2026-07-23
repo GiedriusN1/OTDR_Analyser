@@ -114,9 +114,21 @@ export function describeEndOfFiber(refl) {
 // Diagnostikos tabą, jog suprastų, ką konkreti eilutė reiškia. Linijos galo
 // (end) atveju pilnai perpanaudoja describeEndOfFiber() - tą pačią logiką,
 // kuri jau naudojama Diagnostikos pranešimams, kad paaiškinimai visur sutaptų.
-export function commentForEvent(ev, type) {
+//
+// macrobendMatch (nebūtinas): jei λ palyginimas ŠIOJE pozicijoje jau aptiko
+// makrolenkimo parašą (žr. diagnoseCrossWl() "Makrolenkimo taškai" - tie patys
+// diagai turi _class:'macrobend_point' ir _distance lauką), komentaras turi
+// tai atspindėti - kitaip Events lentelė rekomenduoja "pervirinti movoje", nors
+// realiai reikia tikrinti/taisyti lenkimą, ne suvirinimą.
+export function commentForEvent(ev, type, macrobendMatch) {
     const loss = typeof ev.loss === 'number' ? ev.loss : 0;
     const refl = typeof ev.refl === 'number' ? ev.refl : 0;
+    if (macrobendMatch && (type === 'splice' || type === undefined)) {
+        // Neutralus formulavimas abiem poros pusėms - šis event'as gali būti TIEK
+        // didesnio, TIEK mažesnio nuostolio pusė (kitos bangos ilgio event'as
+        // gali rodyti didesnį arba mažesnį nuostolį toje pačioje pozicijoje).
+        return 'Šioje pozicijoje λ palyginimas rado makrolenkimo požymį (kito bangos ilgio nuostolis toje pat vietoje ženkliai skiriasi - žr. λ palyginimo skiltį) - tikėtina, kad ' + loss.toFixed(3) + ' dB nuostolis čia yra NE suvirinimo defektas, o lenkimo/spaudimo pasekmė. Netikslinga pervirinti movoje - patikrinti, ar kabelis šioje vietoje nesulenktas/nesuspaustas.';
+    }
     switch (type) {
         case 'launch':
             return 'Prijungimo taškas (OTDR įvadas) - matavimo pradžia, nevertinama kaip defektas.';
@@ -686,6 +698,18 @@ export function diagnoseSingle(sor) {
         if (onset) sor.unreliable_from_km = onset.x;
     }
 
+    // Ar trasa "virsta triukšmu" TIKSLIAI ten, kur prietaisas deklaravo tikrą
+    // fizinį galą ('E' tipo žyma)? Tai NORMALUS, TIKĖTAS realaus galo požymis
+    // (signalas negrįžta iš linijos pabaigos - kas gi kitas turėtų ten būti,
+    // jei ne triukšmas?), o NE įrodymas, kad matavimas nepatikimas. 0.3 km
+    // riba parinkta pagal realius failus (2_KS3L_Paobelys) - onset ten
+    // aptinkamas ~100-120 m PRIEŠ deklaruotą galą (natūrali pereiga per galo
+    // atspindžio kilimo frontą). Ta pati riba naudojama ir
+    // measurement-quality.js endReliabilityCheck() - laikykite sinchroniška.
+    const declaredEndEvent = (sor.events || []).find(e => e.typeStr && e.typeStr.length > 1 && e.typeStr[1] === 'E');
+    const onsetConfirmsRealEnd = typeof sor.unreliable_from_km === 'number' && declaredEndEvent &&
+        Math.abs(sor.unreliable_from_km - declaredEndEvent.distance) <= 0.3;
+
     // ── 0. OTDR prijungimo (launch) artefakto pranešimas ──
     // Jei aptiktas artefaktas (soties atsigavimo šleifas po paleidimo jungties)
     // ilgesnis nei 20 m, informuojame vartotoją - ši zona NEVERTINAMA nei
@@ -732,7 +756,20 @@ export function diagnoseSingle(sor) {
     // MES PATYS jau nustojome skaičiuoti avg_attenuation/total_loss_calculated
     // už šio taško - šis pranešimas tiesiog paaiškina vartotojui KODĖL ir KĄ
     // daryti toliau.
-    if (typeof sor.unreliable_from_km === 'number') {
+    if (typeof sor.unreliable_from_km === 'number' && onsetConfirmsRealEnd) {
+        // Triukšmas prasideda TIKSLIAI ties deklaruotu galu - tai patvirtina
+        // galą, ne diskredituoja matavimą. Ramus, informacinis pranešimas
+        // vietoj klaidinančio "duomenys nepatikimi" - segmentų analizė VIS
+        // TIEK apkarpoma šiame taške (žr. analyzeSegmentAttenuation), kad
+        // pačios triukšmo uodegos neinterpretuotume kaip defektų, bet bendra
+        // linija NĖRA nepatikima.
+        diags.push({
+            sev: 'info',
+            category: '✅ Linijos galas patvirtintas',
+            msg: 'Ties ' + declaredEndEvent.distance.toFixed(3) + ' km deklaruotas linijos galas, ir signalas natūraliai virsta triukšmu netoli šio taško (~' + sor.unreliable_from_km.toFixed(3) + ' km) - tai tipiškas sveikos, iki galo išmatuotos linijos požymis, ne problema.',
+            rec: 'Papildomo veiksmo nereikia.'
+        });
+    } else if (typeof sor.unreliable_from_km === 'number') {
         const badKm = sor.unreliable_from_km;
         const badEvent = (sor.events || []).find(e => Math.abs(e.distance - badKm) < 0.001) || null;
         const nearStart = badKm < 1.0;
@@ -748,11 +785,14 @@ export function diagnoseSingle(sor) {
     }
 
     // ── 1. Bendras slopinimas ──
-    // Kai sor.unreliable_from_km nustatytas, avg_attenuation lieka 0 ne todėl,
-    // kad slopinimas realiai nulinis, o todėl, kad jo NEPAVYKO patikimai
-    // apskaičiuoti (žr. 0c pranešimą aukščiau) - praleidžiame šį bloką, kad
-    // neklaidintume vartotojo "atitinka normą" pranešimu.
-    if (typeof sor.unreliable_from_km === 'number') {
+    // Kai sor.unreliable_from_km nustatytas IR NESUTAMPA su deklaruotu galu
+    // (t.y. tikra problema, ne normali triukšmo uodega po galo), avg_attenuation
+    // gali būti 0 ne todėl, kad slopinimas realiai nulinis, o todėl, kad jo
+    // NEPAVYKO patikimai apskaičiuoti (žr. 0c pranešimą aukščiau) - praleidžiame
+    // šį bloką, kad neklaidintume vartotojo "atitinka normą" pranešimu. Bet jei
+    // onsetConfirmsRealEnd - avg_attenuation SKAIČIUOTAS iki tikro galo ir yra
+    // patikimas, tad normalus slopinimo vertinimas turi vykti kaip įprastai.
+    if (typeof sor.unreliable_from_km === 'number' && !onsetConfirmsRealEnd) {
         // 0c pranešimas jau paaiškino situaciją - papildomo nereikia.
     } else if (att > lim.max * 1.5) {
         diags.push({
@@ -1033,7 +1073,9 @@ export function diagnoseCrossWl(byWl) {
                     category: '💀 ' + t('diag_macrobend') + ' @ ' + ev1550.distance.toFixed(3) + ' ' + t('unit_km'),
                     msg: t('diag_macrobend_point_critical', { loss: loss1550.toFixed(3), dist: ev1550.distance.toFixed(3) }),
                     rec: t('rec_bend_point', { dist: ev1550.distance.toFixed(3) }),
-                    edu: 'bend_point'
+                    edu: 'bend_point',
+                    _class: 'macrobend_point',
+                    _distance: ev1550.distance
                 });
             } else if (ratio > cmp.event_ratio_threshold && loss1550 > 1.5) {
                 // Jei > 1.5 dB – critical su kaukole
@@ -1042,7 +1084,9 @@ export function diagnoseCrossWl(byWl) {
                     category: '💀 ' + t('diag_macrobend') + ' @ ' + ev1550.distance.toFixed(3) + ' ' + t('unit_km'),
                     msg: t('diag_macrobend_point_warning', { loss1550: loss1550.toFixed(3), ratio: ratio.toFixed(1), loss1310: loss1310.toFixed(3), dist: ev1550.distance.toFixed(3) }),
                     rec: t('rec_bend_point', { dist: ev1550.distance.toFixed(3) }),
-                    edu: 'bend_point'
+                    edu: 'bend_point',
+                    _class: 'macrobend_point',
+                    _distance: ev1550.distance
                 });
             } else if (ratio > cmp.event_ratio_threshold && loss1550 > 0.3) {
                 diags.push({
@@ -1050,7 +1094,9 @@ export function diagnoseCrossWl(byWl) {
                     category: t('diag_macrobend') + ' @ ' + ev1550.distance.toFixed(3) + ' ' + t('unit_km'),
                     msg: t('diag_macrobend_point_warning', { loss1550: loss1550.toFixed(3), ratio: ratio.toFixed(1), loss1310: loss1310.toFixed(3), dist: ev1550.distance.toFixed(3) }),
                     rec: t('rec_bend_point', { dist: ev1550.distance.toFixed(3) }),
-                    edu: 'bend_point'
+                    edu: 'bend_point',
+                    _class: 'macrobend_point',
+                    _distance: ev1550.distance
                 });
             }
         }

@@ -413,13 +413,29 @@ const wlSpans = showWavelength ? [...new Set(g.events.map(e => e.wl))].sort().ma
                 byFile[e.file].push(e);
             });
 
+            // Kryžminio λ palyginimo makrolenkimo taškai (žr. diagnoseCrossWl()
+            // "Makrolenkimo taškai") - naudojama, kad Events lentelės komentaras
+            // NEREKOMENDUOTŲ "pervirinti movoje", kai λ palyginimas ŠIOJE
+            // pozicijoje jau nustatė, kad tai makrolenkimas, ne suvirinimo defektas.
+            const macrobendByFile = {};
+            (state.diagnostics || []).forEach(g => {
+                const points = (g.cross_wl || []).filter(d => d._class === 'macrobend_point');
+                if (!points.length) return;
+                Object.values(g.files || {}).forEach(fname => {
+                    if (!macrobendByFile[fname]) macrobendByFile[fname] = [];
+                    macrobendByFile[fname].push(...points.map(p => p._distance));
+                });
+            });
+
             document.getElementById('eventsBody').innerHTML = fileOrder.map(file => {
                 const list = byFile[file].slice().sort((a, b) => a.distance - b.distance);
                 const wl = list[0].wl;
                 const col = WL_COLORS[getClosestStandardWavelength(wl)] || '#888';
+                const mbDistances = macrobendByFile[file] || [];
                 const tableRows = list.map((e, i) => {
                     const lc = e.loss > RULES.splice.critical ? 'loss-bad' : e.loss > RULES.splice.warn ? 'loss-warn' : 'loss-ok';
-                    const comment = commentForEvent(e, e.type);
+                    const mbMatch = mbDistances.some(d => Math.abs(d - e.distance) < RULES.wavelength_comparison.event_distance_tolerance);
+                    const comment = commentForEvent(e, e.type, mbMatch);
                     // Rodome eilės numerį pagal DABAR matomą (po 1km korekcijos
                     // filtravimo) sąrašą, o ne originalų SOR failo e.index - kitaip
                     // pašalinus dirbtinės linijos eventą numeracija prasidėtų nuo 2.

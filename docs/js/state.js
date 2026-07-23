@@ -15,6 +15,11 @@ export const state = {
     // atsisiuntimo į Downloads ir be pakartotinio "Išsaugoti kaip" dialogo.
     sorDirHandle: null,
     fileDirHandles: new Map(), // relPath -> jį saugančio paaplankio rankena
+    // Kai failai pasirinkti pavieniui ("Failai" per showOpenFilePicker), aplankas
+    // NEŽINOMAS (naršyklė jo neatskleidžia) - bet PAČIO failo rankeną turime, ir
+    // ją galime naudoti kaip showSaveFilePicker() "startIn" užuominą, kad
+    // Išsaugojimo dialogas atsidarytų TAME PAČIAME aplanke, kuriame yra .sor.
+    fileHandles: new Map(), // failo vardas -> FileSystemFileHandle
 };
 
 // Helper to reset state (if needed)
@@ -31,5 +36,6 @@ export function resetState() {
     state.markerB = 0.92;
     state.sorDirHandle = null;
     state.fileDirHandles = new Map();
+    state.fileHandles = new Map();
 }
 

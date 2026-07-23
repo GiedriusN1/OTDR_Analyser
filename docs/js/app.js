@@ -10,6 +10,7 @@ import { exportExcel, exportPdf } from './export.js';
 // ── DOM refs ──
 const pickFiles = document.getElementById('pickFiles');
 const pickDir = document.getElementById('pickDir');
+const btnPickFiles = document.getElementById('btnPickFiles');
 const btnPickDir = document.getElementById('btnPickDir');
 const btnClear = document.getElementById('btnClear');
 const btnAnalyze = document.getElementById('btnAnalyze');
@@ -179,6 +180,40 @@ pickFiles.addEventListener('change', e => { handleFiles(e.target.files);
     e.target.value = ''; });
 pickDir.addEventListener('change', e => { handleFiles(e.target.files);
     e.target.value = ''; });
+
+// ── Pavienių failų pasirinkimas per File System Access API (Chrome/Edge) ──
+// Skirtingai nuo <input type=file>, showOpenFilePicker() grąžina TIKRĄ
+// FileSystemFileHandle - iš PAVIENIO failo aplanko naršyklė vis tiek
+// neatskleidžia (saugumo apribojimas), BET patį failo handle vėliau galime
+// paduoti showSaveFilePicker({startIn: handle}) kaip užuominą, kad Išsaugojimo
+// dialogas atsidarytų TAME PAČIAME aplanke, o ne Documents/Downloads - taip
+// nereikia prisiminti/naviguoti, kuriame iš kelių matavimų aplankų (SOR_2025,
+// Matavimai, OTDR_matavimai...) yra šis konkretus .sor failas.
+if (btnPickFiles) {
+    btnPickFiles.addEventListener('click', async () => {
+        if ('showOpenFilePicker' in window) {
+            try {
+                const handles = await window.showOpenFilePicker({
+                    multiple: true,
+                    types: [{ description: 'SOR / pastabos', accept: { 'application/octet-stream': ['.sor'], 'application/json': ['.json'] } }]
+                });
+                const files = [];
+                for (const handle of handles) {
+                    const file = await handle.getFile();
+                    state.fileHandles.set(file.name, handle);
+                    files.push(file);
+                }
+                handleFiles(files);
+            } catch (e) {
+                if (e.name === 'AbortError') return; // vartotojas atšaukė pasirinkimą
+                console.warn('showOpenFilePicker klaida, grįžtama prie standartinio failų pasirinkimo:', e.message);
+                pickFiles.click();
+            }
+            return;
+        }
+        pickFiles.click();
+    });
+}
 
 // ── Aplanko pasirinkimas per File System Access API (Chrome/Edge) ──
 // Skirtingai nuo <input webkitdirectory>, showDirectoryPicker() grąžina TIKRĄ
@@ -380,6 +415,10 @@ btnNotes.addEventListener('click', async () => {
         toExport.push({
             filename: sor.file.replace(/\.sor$/i, '') + '.notes.json',
             dirHandle: state.fileDirHandles.get(relPath) || null,
+            // Jei failas buvo atidarytas pavieniui ("Failai"), aplanko rankenos
+            // neturime, bet TURIME paties .sor failo rankeną - ją naudosime kaip
+            // showSaveFilePicker "startIn" užuominą (žr. žemiau).
+            startInHint: state.fileHandles.get(sor.file) || null,
             payload: { sourceFile: sor.file, exportedAt: new Date().toISOString(), annotations }
         });
     });
@@ -412,10 +451,18 @@ btnNotes.addEventListener('click', async () => {
         }
         if (supportsPicker) {
             try {
-                const handle = await window.showSaveFilePicker({
-                    suggestedName: item.filename,
-                    types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
-                });
+                // SVARBU: sąmoningai NEnurodome "types" filtro (pvz. tik .json) -
+                // toks filtras paslėptų .sor failus dialogo lange, ir vartotojas
+                // nebematytų, ar iš viso yra tame pačiame aplanke, kur yra jo
+                // analizuojamas .sor failas. Be filtro dialogas rodo VISUS
+                // failus - .sor lieka matomas kaip orientyras.
+                // startIn: startInHint (jei žinomas .sor failo handle iš "Failai"
+                // pasirinkimo) atidaro dialogą IŠKART tame pačiame aplanke, kur
+                // yra analizuojamas .sor - nereikia prisiminti/naviguoti tarp
+                // kelių matavimų aplankų.
+                const opts = { suggestedName: item.filename };
+                if (item.startInHint) opts.startIn = item.startInHint;
+                const handle = await window.showSaveFilePicker(opts);
                 const writable = await handle.createWritable();
                 await writable.write(text);
                 await writable.close();

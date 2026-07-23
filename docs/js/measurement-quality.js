@@ -1,35 +1,69 @@
 // ── OTDR matavimo kokybės vertinimas ──
 // Grynas, be UI: priima parseSOR() rezultatą, grąžina balą + patikrų sąrašą
 // žmogiška kalba. Testuojama atskirai, prieš integruojant į programą.
+import { detectNoiseOnset } from './advanced-diagnostics.js';
+
+// Kiek km toliau nuo deklaruoto galo laikome triukšmo pradžią VIS DAR "tuo
+// pačiu" reiškiniu (natūrali pereiga per galo atspindžio kilimo frontą), o ne
+// nesusijusiu, ankstesniu problemos tašku. Nustatyta pagal realius failus
+// (2_KS3L_Paobelys) - onset ten aptinkamas ~100-120 m PRIEŠ deklaruotą galą.
+const END_NOISE_MATCH_TOLERANCE_KM = 0.3;
+
+// Tikroji atstumo riba, kurią impulsui/vidurkinimui REIKIA "apšviesti" - tai
+// NĖRA vartotojo nustatytas Range (jis dažnai sąmoningai 1.3-2x didesnis už
+// realų linijos ilgį, dėl atsargos), o faktinis linijos ilgis: deklaruoto
+// galo (tipo žymos "E") atstumas, arba, jei jo nėra, paskutinio įvykio
+// atstumas. Naudojant patį Range čia, sąmoningai su atsarga parinktas platus
+// Range VISADA sukeltų klaidingą "impulsas per trumpas" perspėjimą, nors
+// realiam linijos ilgiui impulsas buvo visiškai tinkamas.
+function estimateRealReachKm(sor) {
+    const events = sor.events || [];
+    if (!events.length) return sor.range_km || 0;
+    const declaredEnd = events.find(e => e.typeStr && e.typeStr.length > 1 && e.typeStr[1] === 'E');
+    if (declaredEnd) return declaredEnd.distance;
+    const lastEv = events.reduce((a, b) => a.distance > b.distance ? a : b);
+    return lastEv.distance || sor.range_km || 0;
+}
+
+// Laipsniškas (ne staigus) svoris: kuo labiau nukrypta nuo rekomendacijos,
+// tuo didesnė bauda, bet nedidelis nukrypimas (vos per vieną "žingsnį")
+// beveik nebaudžiamas - vietoj to, kad iškart kristų ant fiksuotos 15/25
+// vertės. maxWeight pasiekiamas ties atRatio (arba daugiau).
+function gradedWeight(ratio, maxWeight, atRatio) {
+    const frac = Math.max(0, Math.min(1, (ratio - 1) / (atRatio - 1)));
+    return Math.round(frac * maxWeight);
+}
 
 function pulseCheck(sor) {
-    const rangeKm = sor.range_km || 0;
+    const reachKm = estimateRealReachKm(sor);
     const pulseNs = sor.pulse_width || 0;
     let recMin, recMax, label;
-    if (rangeKm <= 5) { recMin = 10; recMax = 30; label: label = '≤5 km'; }
-    else if (rangeKm <= 20) { recMin = 30; recMax = 100; label = '5–20 km'; }
+    if (reachKm <= 5) { recMin = 10; recMax = 30; label = '≤5 km'; }
+    else if (reachKm <= 20) { recMin = 30; recMax = 100; label = '5–20 km'; }
     else { recMin = 100; recMax = 1000; label = '>20 km'; }
 
     if (pulseNs < recMin) {
         const ratio = recMin / pulseNs;
+        const weight = gradedWeight(ratio, 25, 3);
         return {
             id: 'pulse',
             pass: false,
-            severity: ratio > 3 ? 'critical' : 'warning',
-            weight: ratio > 3 ? 25 : 15,
+            severity: ratio > 2.5 ? 'critical' : weight > 0 ? 'warning' : 'info',
+            weight,
             title: 'Impulsas per trumpas šios trasos ilgiui',
-            detail: 'Naudotas impulsas ' + pulseNs + ' ns, o ' + rangeKm.toFixed(1) + ' km (' + label + ') trasai rekomenduojama ' + recMin + '–' + recMax + ' ns.',
+            detail: 'Naudotas impulsas ' + pulseNs + ' ns, o realiam linijos ilgiui (~' + reachKm.toFixed(1) + ' km, ' + label + ') rekomenduojama ' + recMin + '–' + recMax + ' ns.',
             advice: 'Rekomenduojama: iki 5 km → 10–30 ns; 5–20 km → 30–100 ns; virš 20 km → 100–1000 ns.'
         };
     }
     if (pulseNs > recMax * 1.5) {
+        const ratio = pulseNs / recMax;
         return {
             id: 'pulse',
             pass: false,
             severity: 'warning',
-            weight: 8,
+            weight: gradedWeight(ratio, 8, 3),
             title: 'Impulsas gerokai ilgesnis nei būtina',
-            detail: 'Naudotas impulsas ' + pulseNs + ' ns šios trasos ilgiui (' + label + ') galėjo suteikti pernelyg didelę dead zone, prarandant artimus įvykius.',
+            detail: 'Naudotas impulsas ' + pulseNs + ' ns realiam linijos ilgiui (~' + reachKm.toFixed(1) + ' km, ' + label + ') galėjo suteikti pernelyg didelę dead zone, prarandant artimus įvykius.',
             advice: 'Trumpesnis impulsas (' + recMin + '–' + recMax + ' ns) leistų geriau matyti artimus eventus.'
         };
     }
@@ -37,23 +71,24 @@ function pulseCheck(sor) {
 }
 
 function averagingCheck(sor) {
-    const rangeKm = sor.range_km || 0;
+    const reachKm = estimateRealReachKm(sor);
     const avgS = sor.avg_time_s;
     if (!avgS) return { id: 'averaging', pass: true, title: 'Vidurkinimo trukmė nežinoma (praleista patikra)' };
     let recMin;
-    if (rangeKm <= 10) recMin = 15;
-    else if (rangeKm <= 30) recMin = 30;
+    if (reachKm <= 10) recMin = 15;
+    else if (reachKm <= 30) recMin = 30;
     else recMin = 60;
 
     if (avgS < recMin) {
         const ratio = recMin / avgS;
+        const weight = gradedWeight(ratio, 25, 4);
         return {
             id: 'averaging',
             pass: false,
-            severity: ratio > 4 ? 'critical' : 'warning',
-            weight: ratio > 4 ? 25 : 15,
+            severity: ratio > 3 ? 'critical' : weight > 0 ? 'warning' : 'info',
+            weight,
             title: 'Per trumpas vidurkinimas (averaging)',
-            detail: 'Naudota tik ' + avgS + ' s vidurkinimo ' + rangeKm.toFixed(1) + ' km trasai (rekomenduojama ≥ ' + recMin + ' s).',
+            detail: 'Naudota tik ' + avgS + ' s vidurkinimo realiam ~' + reachKm.toFixed(1) + ' km linijos ilgiui (rekomenduojama ≥ ' + recMin + ' s).',
             advice: 'Padidinkite averaging bent iki ' + recMin + ' s - žemesnis triukšmo lygis leis patikimiau matyti tolimus įvykius ir tiksliau apskaičiuoti ORL.'
         };
     }
@@ -78,21 +113,31 @@ function launchCheck(sor, has1kmLine) {
     // aprašo artefaktą PRIEŠ korekciją, t.y. pačioje dirbtinėje linijoje, o ne
     // realioje matuojamoje linijoje).
     if (has1kmLine && artifactM <= 1000) {
-        return { id: 'launch', pass: true, title: 'Launch kabelis (dirbtinė 1 km linija) naudotas' };
+        return { id: 'launch', pass: true, title: 'Prijungimo dead zone dydis priimtinas (dirbtinė 1 km linija naudojama)' };
     }
 
-    if (artifactM > formulaFloorM * 1.5 && artifactM > 100) {
+    // SVARBU: ši patikra NIEKADA negali įrodyti, kad launch kabelis TIKRAI
+    // buvo naudotas - mažas atsigavimo artefaktas vienodai atitinka ir "launch
+    // kabelis naudotas", ir "launch kabelio nebuvo, bet OTDR jungtis buvo
+    // švari". Todėl PASS atveju pavadinimas aprašo tik tai, ką iš tikrųjų
+    // matuojame - artefakto dydį, ne prielaidą apie tai, KAIP buvo matuota.
+    // Anksčiau čia buvo papildomas fiksuotas "&& artifactM > 100" slenkstis,
+    // kuris trumpiems impulsams (mažas formulaFloorM) visiškai užmaskuodavo
+    // reikšmingą santykinį perviršį (pvz. 54 m vs ~33 m fizikos riba pagal
+    // 50 ns impulsą - 65% daugiau, bet niekada nepasiekdavo 100 m slenksčio).
+    const absoluteFloorM = Math.max(20, formulaFloorM * 0.5);
+    if (artifactM > formulaFloorM * 1.5 && artifactM > absoluteFloorM) {
         return {
             id: 'launch',
             pass: false,
             severity: 'warning',
             weight: 12,
-            title: 'Galimai nenaudotas pulso slopinimo (launch) kabelis',
-            detail: 'OTDR prijungimo artefaktas užima ' + artifactM + ' m - tai gerokai daugiau nei ' + Math.round(formulaFloorM) + ' m, kurių reikalautų vien ' + pulseNs + ' ns impulso fizika. Papildomas atsigavimas rodo stiprų trikdį (galimai nešvarus/atviras OTDR portas be launch kabelio).',
-            advice: 'Naudokite launch (pulso slopinimo) kabelį prieš matuojamą liniją - taip pirmieji metrai bus tiksliai išmatuoti, o ne paslėpti papildomame sotiems atsigavimo šleife.'
+            title: 'Prijungimo dead zone didesnė nei tikėtasi šiam impulsui',
+            detail: 'OTDR prijungimo artefaktas užima ' + artifactM + ' m - tai gerokai daugiau nei ' + Math.round(formulaFloorM) + ' m, kurių reikalautų vien ' + pulseNs + ' ns impulso fizika. Tai NEBŪTINAI reiškia, kad launch kabelis nenaudotas - taip pat gali rodyti nešvarų/atvirą OTDR portą net ir su launch kabeliu.',
+            advice: 'Jei launch kabelis nenaudojamas - naudokite jį prieš matuojamą liniją. Jei jau naudojamas - patikrinkite OTDR ir launch kabelio jungčių švarumą.'
         };
     }
-    return { id: 'launch', pass: true, title: 'Launch kabelis (arba dirbtinė linija) naudotas' };
+    return { id: 'launch', pass: true, title: 'Prijungimo dead zone dydis priimtinas' };
 }
 
 function saturationCheck(sor) {
@@ -141,6 +186,27 @@ function endReliabilityCheck(sor, settingsInadequate, corroboratingEvidence) {
     const lastEv = events.length ? (events.find(e => e.typeStr && e.typeStr.length > 1 && e.typeStr[1] === 'E') || events.reduce((a, b) => a.distance > b.distance ? a : b)) : null;
     const isEndType = lastEv && lastEv.typeStr && lastEv.typeStr.length > 1 && lastEv.typeStr[1] === 'E';
     if (!isEndType) return { id: 'end_reliability', pass: true, title: 'Praleista (linijos galas neaiškus)' };
+
+    // TIESIOGINIS fizinis patikrinimas: ar signalas IŠ TIKRŲJŲ virsta
+    // statistiniu triukšmu netoli deklaruoto galo? Tai tiesioginis, pirmo
+    // rango įrodymas (realaus fiber galo požymis YRA būtent toks - signalas
+    // negrįžta, todėl triukšmas prasideda IŠKART po jo), stipresnis už bet
+    // kokį netiesioginį samprotavimą apie nustatymus (pulse/averaging) - net
+    // jei nustatymai neoptimalūs, tiesiogiai stebimas triukšmo pradžios
+    // sutapimas su galu VIENAREIKŠMIŠKAI patvirtina, kad tai realus galas, o
+    // ne signalas, "nuskendęs triukšme" per anksti. Patikrinta su realiais
+    // failais (2_KS3L_Paobelys): onset aptinkamas ~100-120 m PRIEŠ deklaruotą
+    // galą - natūrali pereiga per galo atspindžio frontą, ne atskiras defektas.
+    const onset = detectNoiseOnset(sor);
+    if (onset && Math.abs(onset.x - lastEv.distance) <= END_NOISE_MATCH_TOLERANCE_KM) {
+        return {
+            id: 'end_reliability',
+            pass: true,
+            severity: 'info',
+            weight: 0,
+            title: 'Linijos galas patvirtintas: signalas natūraliai virsta triukšmu netoli galo'
+        };
+    }
 
     // Triukšmas PO deklaruoto galo yra visada (normalu, savaime nediagnostiška -
     // net tikras galas turi triukšmo "uodegą" už savęs). Vien atspindžio
