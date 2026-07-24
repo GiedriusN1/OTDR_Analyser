@@ -40,7 +40,15 @@ export const RULES = {
         // diagnostics.js dabar naudoja water_peak_max_diff (žr. diagnoseCrossWl).
         water_peak_ratio: 1.30,
         water_peak_max_diff: 0.03,
-        event_distance_tolerance: 0.15,
+        // NUSTATYTA per DIDELĖ (0.15 = 150m) - naudojama TIEK tikrai to paties
+        // fizinio įvykio suradimui KITOJE bangoje, TIEK consolidateEvents()
+        // event'ų grupavimui (Event'ų juostai/lentelei/grafikui). Realiuose
+        // failuose ta pati suvirinimo vieta tarp 1310/1550nm skiriasi tik
+        // ~0-2 m (patikrinta keliuose realiuose failuose) - 150m toleravimas
+        // klaidingai sulydydavo KELIS skirtingus, arti vienas kito esančius,
+        // realius event'us (pvz. suvirinimus, nutolusius vos 26-60 m) į VIENĄ
+        // pseudo-event'ą su prasminę reikšmę neturinčia vidutine pozicija.
+        event_distance_tolerance: 0.01,
         event_loss_threshold: 0.15,
         loss_1625_vs_1550: { warn_diff: 0.05 },
     },
