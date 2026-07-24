@@ -216,18 +216,29 @@ export function classifyEvent(ev, allEvents = null, rangeKm = null) {
     if (isWdmKeyword) return 'wdm';
     if (state.hasWdm) return 'wdm';
 	}
-	if (loss > 0.5) return 'splice';
-	
-	
 
-    // 4) Didelis suvirinimo nuostolis (prioritetas prieš atspindį)
-    if (loss > 0.5) return 'splice';
+    // 4) Neatspindintys įvykiai. SVARBU: tikras suvirinimas (stiklo-stiklo
+    // sandūra) fiziškai NEGALI turėti Frenelio atspindžio, todėl SOR faile
+    // gauna refl=0 - o bet koks OTDR IŠMATUOTAS (nenulinis) atspindys, kad ir
+    // koks švarus/silpnas (pvz. -63 dB), rodo TIKRĄ atspindinčią sąsają
+    // (jungtį), ne suvirinimą. Ankstesnė "refl < -60 dB taip pat = nėra
+    // atspindžio" riba klaidingai sutapatindavo labai švarią jungtį su
+    // atspindžio nebuvimu, todėl didelio nuostolio jungtys (pvz. nešvarus
+    // OTDR prijungimo laido kontaktas prie ODF) buvo klaidingai vadinamos
+    // "dideliu suvirinimo nuostoliu" su prasme neturinčia "pervirinti movoje"
+    // rekomendacija.
+    const noReflSignal = refl === 0;
 
-    // 5) Neatspindintys įvykiai
-    const noReflSignal = refl === 0 || refl < -60;
+    // 5) Didelis suvirinimo nuostolis (prioritetas prieš atspindį) - TIK jei
+    // nėra jokio išmatuoto atspindžio (kitaip tai jungtis, žr. 6 punktą).
+    if (noReflSignal && loss > 0.5) return 'splice';
 
-    // 6) Atspindys – tikri atspindžiai
-    if (!noReflSignal && refl >= -65) {
+    // 6) Atspindys – tikri atspindžiai. Pašalinta ankstesnė "refl >= -65"
+    // viršutinė riba - jei atspindys IŠMATUOTAS (noReflSignal jau atmetė
+    // refl=0 atvejį), jis lieka jungtimi nepriklausomai nuo to, koks švarus
+    // (pvz. -68 dB) - be šios pataisos tokie įvykiai "iškrisdavo" pro visas
+    // šakas ir gaudavo bereikšmį bendrinį 'event' tipą.
+    if (!noReflSignal) {
         if (refl < -50 && loss < 0.05) {
             return 'splice';
         }

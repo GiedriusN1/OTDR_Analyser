@@ -43,12 +43,16 @@ export const RULES = {
         // NUSTATYTA per DIDELĖ (0.15 = 150m) - naudojama TIEK tikrai to paties
         // fizinio įvykio suradimui KITOJE bangoje, TIEK consolidateEvents()
         // event'ų grupavimui (Event'ų juostai/lentelei/grafikui). Realiuose
-        // failuose ta pati suvirinimo vieta tarp 1310/1550nm skiriasi tik
-        // ~0-2 m (patikrinta keliuose realiuose failuose) - 150m toleravimas
-        // klaidingai sulydydavo KELIS skirtingus, arti vienas kito esančius,
-        // realius event'us (pvz. suvirinimus, nutolusius vos 26-60 m) į VIENĄ
-        // pseudo-event'ą su prasminę reikšmę neturinčia vidutine pozicija.
-        event_distance_tolerance: 0.01,
+        // failuose ta pati suvirinimo vieta tarp 1310/1550nm dažniausiai
+        // skiriasi ~0-2 m, bet pasitaiko ir iki ~12-13 m (patikrinta keliuose
+        // realiuose failuose) - 150m toleravimas klaidingai sulydydavo KELIS
+        // skirtingus, arti vienas kito esančius, realius event'us (pvz.
+        // suvirinimus, nutolusius vos 26-60 m) į VIENĄ pseudo-event'ą. 0.01
+        // (10m) buvo per griežta - realiai tą patį suvirinimą kartais
+        // išskirdavo į du. 0.015 (15m) - saugi tarpinė vertė: virš stebėto
+        // tikro tarp-bangų nuokrypio (~12.5m), bet gerokai žemiau mažiausio
+        // stebėto tikrai atskirų event'ų atstumo (~26m).
+        event_distance_tolerance: 0.015,
         event_loss_threshold: 0.15,
         loss_1625_vs_1550: { warn_diff: 0.05 },
     },
