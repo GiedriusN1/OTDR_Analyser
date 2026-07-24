@@ -97,7 +97,7 @@ docs/
 
 3. Atidarykite naršyklėje adresą, kurį pateikė serveris.
 
-   Arba naudokite veikiančią versiją tiesiai iš GitHub Pages: **https://giedriusn1.github.io/OTDR_Analyzer**
+   Arba naudokite veikiančią versiją tiesiai iš GitHub Pages: **https://giedriusn1.github.io/OTDR_Analyser**
 
 ### Naudojimas
 
@@ -209,7 +209,7 @@ docs/
 
 3. Open the address the server printed in your browser.
 
-   Or use the live version directly on GitHub Pages: **https://giedriusn1.github.io/OTDR_Analyzer**
+   Or use the live version directly on GitHub Pages: **https://giedriusn1.github.io/OTDR_Analyser**
 
 ### Usage
 
