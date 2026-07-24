@@ -109,10 +109,16 @@ export function describeEndOfFiber(refl) {
             detail: 'Vidutinis atspindys (' + refl.toFixed(1) + ' dB) - tikėtina arba nužulniai/nelygiai nulūžęs kabelio galas, arba PC jungtis, prijungta prie įrangos (kiek užterlĕjusi arba ne visai standartinė).',
         };
     }
-    if (refl > -45) {
+    if (refl > RULES.diagnostics.apc.critical) {
         return {
             label: 'Kabelio galas prijungtas prie įrangos (UPC)',
             detail: 'Nužemintas atspindys (' + refl.toFixed(1) + ' dB) būdingas švariai UPC jungčiai, prijungtai prie įrangos (siųstuvo, imtuvo, patch panelio) - geras kontaktas.',
+        };
+    }
+    if (refl > RULES.diagnostics.apc.good) {
+        return {
+            label: 'Itin gera UPC jungtis arba galimai APC',
+            detail: 'Labai žemas atspindys (' + refl.toFixed(1) + ' dB) - būdingas išskirtinai švariai/gerai UPC jungčiai, bet dar nepakankamai žemas, kad būtų vienareikšmiškai APC (kampinė) jungtis. Bet kuriuo atveju atspindys praktiškai nekliudo matavimams.',
         };
     }
     return {

@@ -76,7 +76,7 @@ export function analyzeCableWide(groups, RULES, formatWavelength, lang = 'lt') {
                 if (d.sev !== 'critical' && d.sev !== 'warning') return;
                 const r = _parseSegmentRange(d.category);
                 if (!r) return;
-                locEvents.push({ label: labelOf(g), start: r.start, end: r.end, sev: d.sev });
+                locEvents.push({ label: labelOf(g), start: r.start, end: r.end, sev: d.sev, group: g });
             });
         });
     });
@@ -90,10 +90,32 @@ export function analyzeCableWide(groups, RULES, formatWavelength, lang = 'lt') {
         cl.mid = cl.items.reduce((s, i) => s + (i.start + i.end) / 2, 0) / cl.items.length;
     });
     const allLabels = groups.map(labelOf);
+
+    // Ar segmento anomalijos vietoje TOS PAČIOS skaidulos taip pat turi
+    // makrolenkimo signatūrą (cross_wl, _class:'macrobend_point' - 1550 nm
+    // slopimas žymiai didesnis nei 1310 nm ties tuo pačiu tašku)? Vien
+    // segmento slopinimo padidėjimas savaime NEATSKIRIA makrolenkimo nuo
+    // kitos priežasties (mechaninis spaudimas, prasta mova ir pan.) - šis
+    // patikrinimas prideda tą specifiškumą pasinaudojant JAU esančiais
+    // duomenimis, o ne nauju algoritmu.
+    function macrobendSupportFraction(cl) {
+        const uniqueByLabel = [...new Map(cl.items.map(i => [i.label, i])).values()];
+        const withMacrobend = uniqueByLabel.filter(i =>
+            (i.group.cross_wl || []).some(d => d._class === 'macrobend_point' && Math.abs(d._distance - cl.mid) < TOL)
+        );
+        return uniqueByLabel.length ? withMacrobend.length / uniqueByLabel.length : 0;
+    }
+    function macrobendNoteKey(frac) {
+        if (frac >= 0.5) return 'cable_shared_damage_macrobend_yes';
+        if (frac > 0) return 'cable_shared_damage_macrobend_partial';
+        return 'cable_shared_damage_macrobend_no';
+    }
+
     clusters.forEach(cl => {
         const affected = [...new Set(cl.items.map(i => i.label))];
         const hasCritical = cl.items.some(i => i.sev === 'critical');
         const pos = cl.mid.toFixed(2);
+        const macrobendNote = t(macrobendNoteKey(macrobendSupportFraction(cl)));
         if (affected.length >= 2 && affected.length < allLabels.length) {
             const unaffected = allLabels.filter(l => !affected.includes(l));
             diags.push({
@@ -103,7 +125,7 @@ export function analyzeCableWide(groups, RULES, formatWavelength, lang = 'lt') {
                     pos: pos,
                     affected: affected.join(', '),
                     unaffected: unaffected.join(', ')
-                }),
+                }) + ' ' + macrobendNote,
                 rec: t('cable_shared_damage_rec'),
                 _scope: 'cable'
             });
@@ -114,7 +136,7 @@ export function analyzeCableWide(groups, RULES, formatWavelength, lang = 'lt') {
                 msg: t('cable_all_damage_msg', {
                     pos: pos,
                     count: allLabels.length
-                }),
+                }) + ' ' + macrobendNote,
                 rec: t('cable_all_damage_rec'),
                 _scope: 'cable'
             });
