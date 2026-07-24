@@ -206,7 +206,6 @@ export function annotateLaunchZoneAmbiguity(sors, has1kmLine = false, zoneKm = 1
 export function detectNoiseOnset(sor, opts = {}) {
     const windowKm = opts.windowKm ?? 0.15;
     const ratioThreshold = opts.ratioThreshold ?? 4.0;
-    const minPersistKm = opts.minPersistKm ?? 1.0;
     const manualAbsoluteThreshold = opts.absoluteThresholdDb ?? null; // pažengusiems vartotojams
     const trace = sor.trace;
     if (!trace || trace.length < 100) return null;
@@ -217,6 +216,17 @@ export function detectNoiseOnset(sor, opts = {}) {
     const startKm = Math.max(0, (sor.launch_artifact_m || 0) / 1000 + 0.05);
     const startIdx0 = trace.findIndex(p => p.x >= startKm);
     if (startIdx0 < 0) return null;
+
+    // SVARBU: fiksuota 1.0 km persistencijos riba nesiskaluoja su trumpo
+    // Range failais - jei visas matuojamas ruožas po galo yra trumpesnis nei
+    // 1 km (dažnas atvejis trumpoms linijoms su 2-2.5 km Range, pvz.
+    // RAIN_ODF144 sk.120, ~1.73 km linija, 2.5 km Range - tik ~0.77 km
+    // trasos lieka po galo), onset NIEKADA nebūdavo patvirtinamas, nesvarbu
+    // koks akivaizdus triukšmas grafike - tiesiog pritrūkdavo duomenų
+    // patvirtinti reikalaujamą 1 km. Ribą pritaikome pagal faktiškai
+    // turimą trasos ilgį po paieškos pradžios.
+    const availableKm = trace[n - 1].x - startKm;
+    const minPersistKm = Math.min(opts.minPersistKm ?? 1.0, Math.max(0.15, availableKm * 0.35));
 
     function localStd(startIdx) {
         const end = Math.min(n, startIdx + windowPts);
@@ -302,7 +312,7 @@ export function annotateNoiseZoneEvents(sors) {
             sev: 'warning',
             category: '📉 Trasa tampa triukšmu nuo ' + onset.x.toFixed(2) + ' km',
             msg: 'Nuo ' + onset.x.toFixed(2) + ' km signalo liekamasis nuokrypis staigiai ir ilgam padidėja (žymiai virš trasos vidutinio lygio) - trasa čia tampa statistiniu triukšmu, ne realiu signalu. Šioje zonoje esantys eventai (' + indices + ') tikėtinai NĖRA realūs fiziniai įvykiai (jungtys, suvirinimai, ghost reiškiniai) - tai atsitiktiniai triukšmo pikai, kuriuos OTDR programinė įranga klaidingai suklasifikuoja kaip eventus.' + boundaryNote,
-            rec: 'Šios zonos individualiai neanalizuokite - jei reikia patikimų duomenų už ' + onset.x.toFixed(2) + ' km, pakartokite matavimą su ilgesniu impulsu ir vidurkinimu.',
+            rec: 'Šios zonos individualiai neanalizuokite - jei reikia patikimų duomenų už ' + onset.x.toFixed(2) + ' km, pakartokite matavimą su ilgesniu Pulse ir vidurkinimu.',
             _class: 'noise_zone',
             _file: sor.file,
             _distance: onset.x,

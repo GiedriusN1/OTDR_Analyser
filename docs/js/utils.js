@@ -8,6 +8,10 @@ export function setLang(lang) {
     if (translations[lang]) currentLang = lang;
 }
 
+export function getLang() {
+    return currentLang;
+}
+
 export function t(key, params = {}) {
     const dict = translations[currentLang] || translations.lt;
     let text = dict[key] || key;

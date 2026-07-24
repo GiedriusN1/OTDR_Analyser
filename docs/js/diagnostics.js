@@ -387,7 +387,7 @@ function _computeGuardKm(pulseWidthNs, ior, multiplier) {
     return Math.max(0.02, edz_km * multiplier); // min. 20 m saugos riba
 }
 
-function _buildBoundaries(events, endDist, dzEnd, pulseWidthNs, ior) {
+function _buildBoundaries(events, endDist, dzEnd, pulseWidthNs, ior, rangeKm) {
     const DZ = dzEnd ?? 0.05;
     const ANALYSIS_START = DZ + 0.010;
     const WDM_GUARD = 0.05; // 50 m po WDM/PON
@@ -400,8 +400,19 @@ function _buildBoundaries(events, endDist, dzEnd, pulseWidthNs, ior) {
 
     for (const ev of events) {
         const d = ev.distance;
-        // sor.events neturi .type – klasifikuojame čia pat
-        const evType = classifyEvent(ev, events, null);
+        // sor.events neturi .type – klasifikuojame čia pat. SVARBU: rangeKm
+        // BŪTINAI turi būti perduotas (ne null) - be jo classifyEvent()
+        // NIEKADA negrąžina 'end' (isRealEndOfFiber() patikra reikalauja
+        // rangeKm), todėl deklaruotas linijos galas patekdavo į ŽEMIAU
+        // esančią 'refl' guard zonos šaką ir gaudavo savo guardStart tašką
+        // KAIP BOUNDARY, apeinant clampedEndDist apkarpymą (patikrinta su
+        // RAIN_ODF144 sk.120 - segmentas tęsdavosi iki endDist-REFL_GUARD
+        // vietoj tikrojo apkarpyto endDist).
+        const evType = classifyEvent(ev, events, rangeKm);
+
+        // Nė vienas guard taškas negali viršyti apkarpyto endDist - kitaip
+        // apeinamas segmentų apkarpymas (žr. aukščiau esantį paaiškinimą).
+        if (d >= endDist) continue;
 
         // WDM/PON eventas – praleidžiame patį tašką, bet atitraukiame ribą 50 m
         if (evType === 'wdm') {
@@ -417,7 +428,7 @@ function _buildBoundaries(events, endDist, dzEnd, pulseWidthNs, ior) {
         if (evType === 'refl' && (ev.refl || 0) > RULES.reflection.warn) {
             const guardStart = d - REFL_GUARD;
             const guardEnd = d + REFL_GUARD;
-            if (guardStart > pts[pts.length - 1] + 0.020) {
+            if (guardStart < endDist && guardStart > pts[pts.length - 1] + 0.020) {
                 pts.push(guardStart);
             }
             if (guardEnd < endDist && pts[pts.length - 1] + 0.020 < guardEnd) {
@@ -440,10 +451,25 @@ function _buildBoundaries(events, endDist, dzEnd, pulseWidthNs, ior) {
  * Grąžina stipriai reflektuojančių eventų sąrašą su jų guard zonos ribomis,
  * kad būtų galima atfiltruoti segmentus, kritusius į patį piką.
  */
-function _getReflGuardZones(events, pulseWidthNs, ior) {
+function _getReflGuardZones(events, pulseWidthNs, ior, rangeKm) {
     const REFL_GUARD = _computeGuardKm(pulseWidthNs, ior, 10);
+    // SVARBU: be 'refl' tipo, saugome IR linijos GALO ('end') event'ą - jis
+    // dažnai TURI stiprų atspindį (visiškai normalu - atviras/PC/APC kabelio
+    // galas visada šiek tiek atsimuša), kurio ši funkcija anksčiau
+    // neapsaugodavo, nes tikrino TIK type==='refl'. Dėl to paskutinis
+    // segmentas prieš pat galą (regresija, apimanti patį atspindžio piką)
+    // rodydavo klaidingai didelį "slopinimą" - patikrinta su RAIN_ODF144
+    // sk.120, kur JDSU/EXFO ataskaita rodo švarų 0.235 dB/km paskutiniame
+    // ruože, o mūsų įrankis - "🔴 Didelis slopinimas" tiksliai prieš galą.
+    // NEPLATINAME į kiekvieną event'ą su bet kokiu atspindžiu (pvz. eilinius
+    // suvirinimus su nedideliu atspindžiu) - tai per daug maskuotų tikrus
+    // segmento duomenis (patikrinta - sukėlė segmentų susijungimą kituose
+    // failuose, kai buvo bandyta taip).
     return events
-        .filter(ev => classifyEvent(ev, events, null) === 'refl' && (ev.refl || 0) > RULES.reflection.warn)
+        .filter(ev => {
+            const t = classifyEvent(ev, events, rangeKm);
+            return (t === 'refl' || t === 'end') && (ev.refl || 0) > RULES.reflection.warn;
+        })
         .map(ev => ({ start: ev.distance - REFL_GUARD, end: ev.distance + REFL_GUARD }));
 }
 
@@ -682,12 +708,12 @@ function analyzeSegmentAttenuation(sor) {
     const clampedEndDist = (typeof sor.unreliable_from_km === 'number')
         ? Math.min(endDist, sor.unreliable_from_km)
         : endDist;
-    const boundaries = _buildBoundaries(events, clampedEndDist, dzEnd, pulseNs, ior);
+    const boundaries = _buildBoundaries(events, clampedEndDist, dzEnd, pulseNs, ior, sor.range_km);
 
     if (boundaries.length < 2) return [];
 
     // Pirmam ruožui (0–0.5) naudojame 0.1 km segmentus
-    const reflZones = _getReflGuardZones(events, pulseNs, ior);
+    const reflZones = _getReflGuardZones(events, pulseNs, ior, sor.range_km);
     const maskedTrace = _maskReflZones(trace, reflZones);
     const rawSegments = _measureSegments(maskedTrace, boundaries, 0.5);
     const merged = _mergeSegments(rawSegments, lim);
@@ -801,7 +827,7 @@ export function diagnoseSingle(sor) {
             msg: 'Nuo ' + badKm.toFixed(3) + ' km prasideda triukšmas/nepatikimi duomenys — prietaisas pats nutraukė analizę šioje vietoje' + (lossStr ? ' (rastas ' + lossStr + ' nuostolis)' : '') + '. Tolimesnė trasos analizė (slopinimas, segmentai) negalima ir NEBUVO atlikta.',
             rec: nearStart
                 ? 'Pašalinkite arba pataisykite didelį nuostolį ties ' + badKm.toFixed(3) + ' km (nešvari/pažeista jungtis, blogas suvirinimas) ir išmatuokite iš naujo.'
-                : 'Pakartokite matavimą su ilgesniu impulsu (didesnis dinaminis diapazonas), kad OTDR "matytų" toliau už šio taško.'
+                : 'Pakartokite matavimą su ilgesniu Pulse (didesnis dinaminis diapazonas), kad OTDR "matytų" toliau už šio taško.'
         });
     }
 
@@ -840,6 +866,22 @@ export function diagnoseSingle(sor) {
     }
 
     // ── 2. ORL ──
+    // ITU-T tipo optinės sąsajos ORL reikalavimai (G.957/G.691/G.693 ir pan.)
+    // yra FIKSUOTI, NEPRIKLAUSOMAI nuo linijos ilgio - jie saugo siųstuvo
+    // (lazerio) stabilumą nuo per didelės atgal atspindėtos galios, o tai
+    // priklauso nuo ABSOLIUČIOS grįžtančios galios, ne nuo to, kiek tai
+    // "sąžininga" trumpai linijai. Todėl kritiškumo SPRENDIMUI naudojame
+    // FIKSUOTAS RULES.orl ribas - jokio ilgio koregavimo. Bet PAPILDOMAI (tik
+    // informaciškai, sunkumo lygio nekeičiant) paaiškiname, kad trumpose
+    // linijose ORL natūraliai prastesnis dėl mažesnio Rayleigh backscatter
+    // kiekio (patikrinta su RAIN_ODF144 sk.120 prieš 3 nepriklausomus EXFO
+    // šaltinius) - kad vartotojas suprastų kontekstą, bet pranešimas liktų
+    // sąžiningas standarto atžvilgiu.
+    const lineLenKm = _findEndDistance(sor);
+    const orlShortLineNote = (lineLenKm > 0 && lineLenKm < 10)
+        ? ' (Pastaba: tai ~' + lineLenKm.toFixed(1) + ' km linija - trumpose linijose ORL natūraliai prastesnis dėl mažesnio backscatter kiekio, nepriklausomai nuo jungčių kokybės; standarto riba tam išimčių nedaro.)'
+        : '';
+
     const orl = sor.orl || 0;
     if (orl > 0 && orl < RULES.orl.critical) {
         // Kuo ORL arčiau kritinės ribos (ne toli už jos), tuo mažesnis baudos
@@ -849,7 +891,7 @@ export function diagnoseSingle(sor) {
         diags.push({
             sev: 'critical',
             category: t('diag_orl') + ' ' + formatWavelength(sor.wavelength) + 'nm',
-            msg: t('diag_orl_critical', { orl: orl.toFixed(2), critical: RULES.orl.critical }),
+            msg: t('diag_orl_critical', { orl: orl.toFixed(2), critical: RULES.orl.critical }) + orlShortLineNote,
             rec: t('rec_check_connectors'),
             weight
         });
@@ -858,7 +900,7 @@ export function diagnoseSingle(sor) {
         diags.push({
             sev: 'warning',
             category: t('diag_orl') + ' ' + formatWavelength(sor.wavelength) + 'nm',
-            msg: t('diag_orl_warning', { orl: orl.toFixed(2), warn: RULES.orl.warn }),
+            msg: t('diag_orl_warning', { orl: orl.toFixed(2), warn: RULES.orl.warn }) + orlShortLineNote,
             rec: t('rec_clean_connectors'),
             weight
         });
@@ -893,8 +935,32 @@ export function diagnoseSingle(sor) {
 
     // ── 4. EventŲ apdorojimas ──
     for (const ev of sor.events) {
-        // Launch Level – praleidžiame diagnostiką
-        if (ev.distance < 0.001) continue;
+        // Launch Level – nuostolis čia neprasmingas (matavimo pradžios taškas,
+        // ne defektas), BET atspindžio stiprumas PRASMINGAS - jis rodo, koks
+        // švarus PIRMAS (OTDR prievado) konektorius. Patikrinta su EXFO
+        // FastReporter (RAIN_ODF144 sk.120) - jų P/F stulpelis pažymi šį
+        // matavimą kritiniu BŪTENT dėl šio atspindžio (-23.8 dB), kurio mūsų
+        // įrankis anksčiau apskritai netikrindavo (visas launch event'as
+        // buvo praleidžiamas be jokios patikros).
+        if (ev.distance < 0.001) {
+            const refl0 = ev.refl || 0;
+            if (refl0 > RULES.reflection.critical) {
+                diags.push({
+                    sev: 'critical',
+                    category: '🔌 Pirmos jungties atspindys @ ' + ev.distance.toFixed(3) + ' ' + t('unit_km'),
+                    msg: 'Pirmos (OTDR prievado) jungties atspindys ' + refl0.toFixed(1) + ' dB viršija kritinę ribą (' + RULES.reflection.critical + ' dB) - tikėtina nešvarus arba pažeistas OTDR prievadas ar pirmas patch kabelis.',
+                    rec: 'Nuvalyti OTDR prievadą ir pirmo patch kabelio jungtį. Patikrinti mikroskopu.'
+                });
+            } else if (refl0 > RULES.reflection.warn) {
+                diags.push({
+                    sev: 'warning',
+                    category: '🔌 Pirmos jungties atspindys @ ' + ev.distance.toFixed(3) + ' ' + t('unit_km'),
+                    msg: 'Pirmos (OTDR prievado) jungties atspindys ' + refl0.toFixed(1) + ' dB viršija normos ribą (' + RULES.reflection.warn + ' dB) - verta nuvalyti profilaktiškai.',
+                    rec: 'Nuvalyti OTDR prievadą ir pirmo patch kabelio jungtį.'
+                });
+            }
+            continue;
+        }
 
         // 1 km dirbtinėr linija – praleidžiame
         if (isArtificial1kmEvent(ev)) {
@@ -1256,9 +1322,31 @@ export function diagnoseAll(sors) {
         const files = Object.fromEntries(
             Object.entries(byWl).map(([wl, s]) => [wl, s.file])
         );
+        // Žalios (raw) sumavimo reikšmės kiekvienai bangai - naudojama Aplanko
+        // suvestinės PDF eksporte (žr. export.js exportFolderSummaryPdf), kad
+        // nereikėtų iš naujo skaičiuoti grupavimo iš state.parsed. Ilgis imamas
+        // iš total_loss_end_km (patikrinta prieš JDSU/EXFO - artimai atitinka
+        // realų linijos ilgį), su atsargine grįžtimi į paskutinio event'o atstumą.
+        const stats = Object.fromEntries(
+            Object.entries(byWl).map(([wl, s]) => {
+                const lastEv = (s.events && s.events.length) ? s.events.reduce((a, b) => a.distance > b.distance ? a : b) : null;
+                const lengthKm = (typeof s.total_loss_end_km === 'number' && s.total_loss_end_km > 0)
+                    ? s.total_loss_end_km
+                    : (lastEv ? lastEv.distance : 0);
+                return [wl, {
+                    wavelength: s.wavelength,
+                    lengthKm,
+                    avg_attenuation: s.avg_attenuation || 0,
+                    orl: s.orl || 0,
+                    total_loss: s.total_loss || 0,
+                }];
+            })
+        );
+        const lengthValues = Object.values(stats).map(x => x.lengthKm).filter(x => x > 0);
+        const lengthKm = lengthValues.length ? lengthValues.reduce((a, b) => a + b, 0) / lengthValues.length : 0;
         const allD = [...crossWl, ...Object.values(perFile).flat()];
         const { score, grade } = calcQuality(allD);
-        return { group, wavelengths: Object.keys(byWl).map(Number).sort(), cross_wl: crossWl, per_file: perFile, files, score, grade };
+        return { group, wavelengths: Object.keys(byWl).map(Number).sort(), cross_wl: crossWl, per_file: perFile, files, sors: byWl, stats, lengthKm, score, grade };
     });
 }
 
@@ -1280,8 +1368,8 @@ export function getSegmentOverlayData(sor) {
         ? Math.min(endDist, sor.unreliable_from_km)
         : endDist;
     const events = (sor.events || []).slice().sort((a, b) => a.distance - b.distance);
-    const boundaries = _buildBoundaries(events, clampedEndDist, dzEnd, pulseNs, ior);
-    const reflZones = _getReflGuardZones(events, pulseNs, ior);
+    const boundaries = _buildBoundaries(events, clampedEndDist, dzEnd, pulseNs, ior, sor.range_km);
+    const reflZones = _getReflGuardZones(events, pulseNs, ior, sor.range_km);
     const maskedTrace = _maskReflZones(sor.trace, reflZones);
     const raw = _measureSegments(maskedTrace, boundaries, 0.5);
 

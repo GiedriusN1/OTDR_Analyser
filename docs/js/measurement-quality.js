@@ -50,8 +50,8 @@ function pulseCheck(sor) {
             pass: false,
             severity: ratio > 2.5 ? 'critical' : weight > 0 ? 'warning' : 'info',
             weight,
-            title: 'Impulsas per trumpas šios trasos ilgiui',
-            detail: 'Naudotas impulsas ' + pulseNs + ' ns, o realiam linijos ilgiui (~' + reachKm.toFixed(1) + ' km, ' + label + ') rekomenduojama ' + recMin + '–' + recMax + ' ns.',
+            title: 'Pulse per trumpas šios trasos ilgiui',
+            detail: 'Naudotas Pulse ' + pulseNs + ' ns, o realiam linijos ilgiui (~' + reachKm.toFixed(1) + ' km, ' + label + ') rekomenduojama ' + recMin + '–' + recMax + ' ns.',
             advice: 'Rekomenduojama: iki 5 km → 10–30 ns; 5–20 km → 30–100 ns; virš 20 km → 100–1000 ns.'
         };
     }
@@ -62,12 +62,12 @@ function pulseCheck(sor) {
             pass: false,
             severity: 'warning',
             weight: gradedWeight(ratio, 8, 3),
-            title: 'Impulsas gerokai ilgesnis nei būtina',
-            detail: 'Naudotas impulsas ' + pulseNs + ' ns realiam linijos ilgiui (~' + reachKm.toFixed(1) + ' km, ' + label + ') galėjo suteikti pernelyg didelę dead zone, prarandant artimus įvykius.',
-            advice: 'Trumpesnis impulsas (' + recMin + '–' + recMax + ' ns) leistų geriau matyti artimus eventus.'
+            title: 'Pulse gerokai ilgesnis nei būtina',
+            detail: 'Naudotas Pulse ' + pulseNs + ' ns realiam linijos ilgiui (~' + reachKm.toFixed(1) + ' km, ' + label + ') galėjo suteikti pernelyg didelę dead zone, prarandant artimus įvykius.',
+            advice: 'Trumpesnis Pulse (' + recMin + '–' + recMax + ' ns) leistų geriau matyti artimus eventus.'
         };
     }
-    return { id: 'pulse', pass: true, title: 'Tinkamas impulsas' };
+    return { id: 'pulse', pass: true, title: 'Tinkamas Pulse' };
 }
 
 function averagingCheck(sor) {
@@ -135,8 +135,8 @@ function launchCheck(sor, has1kmLine) {
             pass: false,
             severity: 'warning',
             weight: 12,
-            title: 'Trasos pradžios akla zona didesnė nei tikėtasi šiam impulsui',
-            detail: 'OTDR prijungimo artefaktas užima ' + artifactM + ' m - tai gerokai daugiau nei ' + Math.round(formulaFloorM) + ' m, kurių reikalautų vien ' + pulseNs + ' ns impulso fizika. ' + overlapNote,
+            title: 'Trasos pradžios akla zona didesnė nei tikėtasi pagal naudotą Pulse',
+            detail: 'OTDR prijungimo artefaktas užima ' + artifactM + ' m - tai gerokai daugiau nei ' + Math.round(formulaFloorM) + ' m, kurių reikalautų vien ' + pulseNs + ' ns Pulse fizika. ' + overlapNote,
             advice: has1kmLine
                 ? 'Patikrinkite OTDR ir dirbtinės linijos jungčių švarumą.'
                 : 'Patikrinkite/nuvalykite OTDR prievado ir pirmos jungties švarumą. Jei norite, kad ši akla zona nesiedintų su realios linijos matavimu, kitą kartą naudokite dirbtinę (launch) liniją prieš matuojamą liniją ir pažymėkite atitinkamą varnelę.'
@@ -170,7 +170,7 @@ function endOfFiberCheck(sor) {
             weight: 25,
             title: 'Trasa gali būti neišmatuota iki galo',
             detail: 'Paskutinis aptiktas įvykis ties ' + lastEv.distance.toFixed(3) + ' km (tik ' + (coverage * 100).toFixed(0) + '% viso ' + rangeKm.toFixed(1) + ' km matavimo diapazono), ir neatpažintas kaip linijos galas.',
-            advice: 'Padidinkite averaging ir/arba impulsą, kad OTDR "matytų" toliau, arba patikrinkite, ar linija tikrai tiek ilga.'
+            advice: 'Padidinkite averaging ir/arba Pulse, kad OTDR "matytų" toliau, arba patikrinkite, ar linija tikrai tiek ilga.'
         };
     }
     if (isEndType && coverage < 0.5) {
@@ -229,8 +229,8 @@ function endReliabilityCheck(sor, settingsInadequate, corroboratingEvidence) {
             severity: 'critical',
             weight: 25,
             title: 'Deklaruotas linijos galas gali būti KLAIDINGAS',
-            detail: 'Galas ties ' + lastEv.distance.toFixed(2) + ' km, o impulsas/vidurkinimas nepakankami IR papildomi rodikliai (ORL ir/arba vid. slopinimas) taip pat rodo problemą - šis "galas" gali būti ne tikras fizinis linijos galas, o vieta, kur signalas tiesiog nuskendo triukšme.',
-            advice: 'Pakartokite matavimą su ilgesniu impulsu ir vidurkinimu prieš patvirtindami, kad tai tikras linijos galas - už jo gali slypėti dar neaptikti įvykiai (jungtys, suvirinimai, WDM įtaisai).'
+            detail: 'Galas ties ' + lastEv.distance.toFixed(2) + ' km, o Pulse/vidurkinimas nepakankami IR papildomi rodikliai (ORL ir/arba vid. slopinimas) taip pat rodo problemą - šis "galas" gali būti ne tikras fizinis linijos galas, o vieta, kur signalas tiesiog nuskendo triukšme.',
+            advice: 'Pakartokite matavimą su ilgesniu Pulse ir vidurkinimu prieš patvirtindami, kad tai tikras linijos galas - už jo gali slypėti dar neaptikti įvykiai (jungtys, suvirinimai, WDM įtaisai).'
         };
     }
     if (settingsInadequate) {

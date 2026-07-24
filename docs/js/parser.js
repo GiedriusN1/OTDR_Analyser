@@ -176,7 +176,17 @@ export function parseSOR(buffer, filename, relpath) {
                 fxd.bc = i16() * -0.1;
                 fxd.numAvg = u32();
                 if (fmt === 2) {
-                    fxd.avgTime = u16() * 0.1;
+                    // BUVO * 0.1 (tariant, kad laukas saugomas dešimtosiomis
+                    // sekundės dalimis) - bet patikrinta su realiu failu
+                    // (RAIN_ODF144 sk.120) prieš JDSU/EXFO ataskaitą: raw
+                    // reikšmės (10 ir 30) TIKSLIAI sutampa su JDSU deklaruotu
+                    // "Duration (s)" (10 ir 30) BE jokio dešimtainio
+                    // dauginimo - t.y. laukas jau saugomas VISOMIS sekundėmis,
+                    // ne dešimtosiomis. Su senuoju *0.1 dauginimu vidurkinimas
+                    // atrodydavo 10x trumpesnis, nei buvo iš tikrųjų (1s/3s
+                    // vietoj tikrų 10s/30s), klaidingai žymint matavimą kaip
+                    // "kritiškai per trumpą vidurkinimą".
+                    fxd.avgTime = u16();
                     fxd.range = u32() * 2e-5;
                     i32(); i32(); u16(); i16(); u16();
                 } else {

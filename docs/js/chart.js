@@ -378,7 +378,15 @@ export function setupOverlay(ok) {
         if (!chart) return null;
         const rect = ov.getBoundingClientRect();
         const xAxis = chart.scales.x;
-        const px = (e.clientX - rect.left) * (ov.width / rect.width);
+        // SVARBU: xAxis.left/right (Chart.js) yra CSS-pikselių erdvėje - TOJE
+        // PAČIOJE, kaip e.clientX-rect.left (jokio daugybos iš ov.width/rect.width
+        // NEREIKIA). Anksčiau čia buvo dauginama iš (ov.width/rect.width), kas
+        // lygu devicePixelRatio - kai dpr=1 (dauguma įprastų ekranų testavimo
+        // metu) klaida nesimatydavo, bet HiDPI/Retina ekranuose ar naršyklės
+        // mastelyje ≠100% (patvirtinta GitHub Pages diegime) žymeklis nusistumdavo
+        // toliau, nei pelė realiai pajudėjo, ir paklaida augo kuo toliau nuo
+        // kairės (nes tai daugybinė, ne fiksuota poslinkio klaida).
+        const px = e.clientX - rect.left;
         return Math.max(0, Math.min(1, (px - xAxis.left) / (xAxis.right - xAxis.left)));
     }
 

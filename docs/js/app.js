@@ -5,7 +5,7 @@ import { diagnoseAll } from './diagnostics.js';
 import { renderAll, renderEventStrip, evStripHover } from './render.js';
 import { drawOverlay } from './chart.js';
 import { runAiAnalysis } from './ai.js';
-import { exportExcel, exportPdf } from './export.js';
+import { exportExcel, exportPdf, exportFolderSummaryPdf } from './export.js';
 
 // ── DOM refs ──
 const pickFiles = document.getElementById('pickFiles');
@@ -16,6 +16,7 @@ const btnClear = document.getElementById('btnClear');
 const btnAnalyze = document.getElementById('btnAnalyze');
 const btnExcel = document.getElementById('btnExcel');
 const btnPdf = document.getElementById('btnPdf');
+const btnFolderPdf = document.getElementById('btnFolderPdf');
 const btnNotes = document.createElement('button');
 btnNotes.className = 'btn sm';
 btnNotes.id = 'btnNotes';
@@ -124,6 +125,7 @@ function updateButtons() {
     if (btnClear) btnClear.style.display = hasFiles ? 'flex' : 'none';
     if (btnExcel) btnExcel.disabled = true;  // bus įjungti po analizės
     if (btnPdf) btnPdf.disabled = true;
+    if (btnFolderPdf) btnFolderPdf.disabled = true;
 }
 
 function renderSidebar() {
@@ -394,6 +396,7 @@ btnAnalyze.addEventListener('click', async () => {
         resultsWrap.style.display = 'block';
         btnExcel.disabled = false;
         btnPdf.disabled = false;
+        if (btnFolderPdf) btnFolderPdf.disabled = false;
         btnNotes.disabled = false;
         toast(t('toast_analyze_done', { count: ok.length }));
     } catch (e) {
@@ -409,6 +412,7 @@ btnAnalyze.addEventListener('click', async () => {
 // ── Export ──
 btnExcel.addEventListener('click', exportExcel);
 btnPdf.addEventListener('click', exportPdf);
+if (btnFolderPdf) btnFolderPdf.addEventListener('click', exportFolderSummaryPdf);
 
 // ── Pastabų (.notes.json) eksportas ──
 btnNotes.addEventListener('click', async () => {
