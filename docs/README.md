@@ -24,13 +24,13 @@ A modular, browser-based analysis tool for OTDR measurements (SOR format) with m
 - **Triukšmo zonos / dead zone apsauga** – automatiškai randa tašką, kur trasa tampa statistiniu triukšmu, ir toliau nebetęsia segmentų analizės, kad triukšmas nebūtų klaidingai palaikytas „kritiniu pažeidimu“.
 - **Matavimo Range patikra** – įspėja, jei paskutinis įvykis yra arti pat nustatyto Range ribos (galimai per mažas Range numatomam linijos ilgiui).
 - **1 km dirbtinės (launch) linijos palaikymas** – varnelė, kuri automatiškai atima dirbtinės linijos ilgį iš visų atstumų ir event'ų.
-- **Matavimo kokybės balas** – 0–100 (★–★★★★★), vertina impulso plotį, vidurkinimo trukmę, launch kabelio naudojimą, deklaruoto linijos galo patikimumą ir Range atsargą.
+- **Matavimo kokybės balas** – 0–100 (★–★★★★★), vertina Pulse plotį, vidurkinimo trukmę, launch kabelio naudojimą, deklaruoto linijos galo patikimumą ir Range atsargą.
 - **Kabelio lygmens (kelių skaidulų) analizė** – lygina to paties kabelio skaidulas tarpusavyje.
 - **Interaktyvūs grafikai** – vilkite A/B žymeklius tiesiai ant reflektogramos, kad matuotumėte nuostolį bet kurioje atkarpoje.
 - **Event'ų juosta ir lentelė** – vizualus event'ų išdėstymas, redaguojamas tipas ir pastabos kiekvienam event'ui.
 - **Claude AI integracija** – generuokite techninę ataskaitą lietuvių arba anglų kalba tiesiogiai iš analizės duomenų.
 - **Dvikalbė sąsaja** – visa sąsaja perjungiama tarp lietuvių ir anglų kalbų vienu mygtuku.
-- **Eksportas** – pilna Excel (XLSX) ir spausdinimui pritaikyta PDF ataskaita (su įkomponuotu šriftu lietuviškiems simboliams).
+- **Eksportas** – pilna Excel (XLSX), spausdinimui pritaikyta PDF ataskaita (su įkomponuotu šriftu lietuviškiems simboliams) ir viso aplanko suvestinės PDF (visų įkeltų linijų trumpa apžvalga vienoje lentelėje, surūšiuota pagal pavadinimą/skaidulos numerį/ilgį).
 
 ### Failų struktūra
 
@@ -50,12 +50,12 @@ docs/
 │   ├── parser.js                 – binarinio SOR failo skaitytuvas
 │   ├── diagnostics.js            – pagrindinis diagnostikos variklis (segmentai, ORL, makrolenkimas, WDM/PON)
 │   ├── advanced-diagnostics.js   – ghost'ų aptikimas, launch zonos užuominos, triukšmo zonos (dead zone) aptikimas
-│   ├── measurement-quality.js    – matavimo kokybės balas (impulsas, vidurkinimas, Range atsarga, galo patikimumas)
+│   ├── measurement-quality.js    – matavimo kokybės balas (Pulse, vidurkinimas, Range atsarga, galo patikimumas)
 │   ├── fiber-analysis.js         – kabelio lygmens (kelių skaidulų) analizė
 │   ├── chart.js                  – Chart.js reflektogramos braižymas + A/B žymeklių sluoksnis
 │   ├── render.js                 – visų skirtukų (Apžvalga/Event'ai/Diagnostika/λ) DOM atvaizdavimas
 │   ├── ai.js                     – Claude API integracija
-│   ├── export.js                 – Excel ir PDF ataskaitų generavimas
+│   ├── export.js                 – Excel, PDF ir aplanko suvestinės PDF ataskaitų generavimas
 │   ├── fonts_data.js             – įkomponuotas NotoSans šriftas (base64) PDF eksportui
 │   └── package.json              – tuščias Node metaduomenų failas (be paleidžiamų priklausomybių)
 ├── server.js                     – minimalus statinis Node serveris lokaliam peržiūrėjimui
@@ -95,6 +95,8 @@ docs/
 
 3. Atidarykite naršyklėje adresą, kurį pateikė serveris.
 
+   Arba naudokite veikiančią versiją tiesiai iš GitHub Pages: **https://giedriusn1.github.io/OTDR_Analyzer**
+
 ### Naudojimas
 
 1. **Įkelkite SOR failus** – spauskite *Failai* arba *Aplankas* ir pasirinkite matavimo failus.
@@ -103,7 +105,7 @@ docs/
 4. **Naršykite skirtukus** – *Apžvalga*, *Grafikai*, *Event'ai*, *Diagnostika*, *λ Palyginimas*, *Claude AI*.
 5. **Keiskite kalbą** – viršuje dešinėje paspauskite LT / EN mygtukus.
 6. **Naudokite AI** – įveskite savo Claude API raktą (išsaugomas naršyklėje), pasirinkite kalbą ir spauskite *Analizuoti su Claude*.
-7. **Eksportuokite** – mygtukai *Excel* ir *PDF* sukuria pilnas ataskaitas.
+7. **Eksportuokite** – mygtukai *Excel*, *PDF* ir *Aplanko PDF* sukuria pilnas ataskaitas.
 
 ### API raktas
 
@@ -132,13 +134,13 @@ This tool lets you load one or more `.sor` files (Bellcore/Telcordia GR-196 form
 - **Noise-zone / dead-zone protection** – automatically finds the point where the trace becomes statistical noise and stops segment analysis there, so noise isn't misread as "critical damage".
 - **Measurement range check** – warns when the last detected event sits right at the edge of the configured Range (possibly too short for the actual fiber length).
 - **1 km artificial launch line support** – a checkbox that automatically subtracts the launch line's length from every distance and event.
-- **Measurement quality score** – 0–100 (★–★★★★★), scoring pulse width, averaging time, launch cable usage, declared-end reliability, and range margin.
+- **Measurement quality score** – 0–100 (★–★★★★★), scoring Pulse width, averaging time, launch cable usage, declared-end reliability, and range margin.
 - **Cable-wide (multi-fiber) analysis** – cross-compares fibers belonging to the same cable.
 - **Interactive charts** – drag A/B markers directly on the reflectogram to measure loss over any section.
 - **Event strip and table** – visual event layout, editable type and per-event notes.
 - **Claude AI integration** – generate a technical report in Lithuanian or English directly from the analysis data.
 - **Bilingual UI** – the entire interface switches between Lithuanian and English with one click.
-- **Export** – full Excel (XLSX) and print-ready PDF reports (with an embedded font for Lithuanian characters).
+- **Export** – full Excel (XLSX), print-ready PDF reports (with an embedded font for Lithuanian characters), and a whole-folder summary PDF (a compact overview table of every loaded line, sorted by name/fiber number/length).
 
 ### File structure
 
@@ -163,7 +165,7 @@ docs/
 │   ├── chart.js                  – Chart.js reflectogram rendering + A/B marker overlay
 │   ├── render.js                 – DOM rendering for all tabs (Overview/Events/Diagnostics/λ)
 │   ├── ai.js                     – Claude API integration
-│   ├── export.js                 – Excel and PDF report generation
+│   ├── export.js                 – Excel, PDF, and folder-summary PDF report generation
 │   ├── fonts_data.js             – embedded NotoSans font (base64) for PDF export
 │   └── package.json              – empty Node metadata file (no runtime dependencies)
 ├── server.js                     – minimal static Node server for local preview
@@ -203,6 +205,8 @@ docs/
 
 3. Open the address the server printed in your browser.
 
+   Or use the live version directly on GitHub Pages: **https://giedriusn1.github.io/OTDR_Analyzer**
+
 ### Usage
 
 1. **Load SOR files** – click *Files* or *Folder* and select your measurement files.
@@ -211,7 +215,7 @@ docs/
 4. **Browse the tabs** – *Overview*, *Charts*, *Events*, *Diagnostics*, *λ Comparison*, *Claude AI*.
 5. **Switch language** – click the LT / EN buttons in the top right.
 6. **Use AI** – enter your Claude API key (stored in your browser), pick a language, and click *Analyze with Claude*.
-7. **Export** – the *Excel* and *PDF* buttons produce full reports.
+7. **Export** – the *Excel*, *PDF*, and *Folder PDF* buttons produce full reports.
 
 ### API key
 
