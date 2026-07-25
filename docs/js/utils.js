@@ -210,11 +210,21 @@ export function apply1kmCorrection(sors) {
         // tikrai matuojamai linijai. Anksčiau tokie buvo tik apkarpomi iki
         // distance=0, todėl keli skirtingi įvykiai susigrūsdavo tame
         // pačiame taške ir sugadindavo bangų palyginimą bei segmentų ribas.
+        //
+        // BOUNDARY_TOLERANCE_KM: realios dirbtinės (launch) ritės niekada
+        // nebūna lygiai 1000.000 m (gamybos/matavimo paklaida ± keliolika-
+        // keliasdešimt metrų) - jungties eventas, žymintis ritės PABAIGĄ
+        // (perėjimą į tikrąją liniją), dažnai atsiranda šiek tiek ANKSČIAU
+        // nei lygiai 1.0 km (patikrinta su realiu failu: 0.999 km). Per
+        // griežta (praktiškai lygybės) 1.0 km riba tokį eventą klaidingai
+        // laikydavo "vis dar ritės viduje" ir jį PAŠALINDAVO - o tai kaip tik
+        // svarbiausias eventas: pati jungtis tarp ritės ir tikros linijos.
+        const BOUNDARY_TOLERANCE_KM = 0.03;
         const correctedEvents = sor.events
-            .filter(ev => ev.originalDistance >= 1.0 - 1e-6)
+            .filter(ev => ev.originalDistance >= 1.0 - BOUNDARY_TOLERANCE_KM - 1e-6)
             .map(ev => ({
                 ...ev,
-                distance: parseFloat((ev.originalDistance - 1.0).toFixed(4))
+                distance: Math.max(0, parseFloat((ev.originalDistance - 1.0).toFixed(4)))
             }));
         const correctedTrace = sor.trace
             .filter(pt => pt.x >= 1.0 - 1e-6)

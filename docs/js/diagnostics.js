@@ -780,11 +780,17 @@ export function diagnoseSingle(sor) {
     // vidutinio slopinimo skaičiavime, nei segmentų defektų paieškoje.
     const artifactM = sor.launch_artifact_m || 0;
     if (artifactM > 20) {
+        // Jei vartotojas JAU pažymėjo, kad dirbtinė (launch) linija naudota
+        // (state.has1kmLine), rekomenduoti "naudokite dirbtinę liniją" būtų
+        // beprasmiška/prieštaringa - ji jau naudojama. Tokiu atveju vietoj to
+        // pasiūlome patikrinti pačios dirbtinės linijos/jos jungties švarumą.
         diags.push({
             sev: 'info',
             category: 'OTDR prijungimo artefaktas',
-            msg: 'OTDR prijungimo artefaktas 0–' + artifactM + ' m. nevertinamas. Matavimui naudokite dirbtinę liniją.',
-            rec: 'Naudokite pulso slopinimo (launch) kabelį prieš matuojamą liniją - taip pradinėr zona bus tiksliai išmatuota.'
+            msg: 'OTDR prijungimo artefaktas 0–' + artifactM + ' m. nevertinamas.' + (state.has1kmLine ? '' : ' Matavimui naudokite dirbtinę liniją.'),
+            rec: state.has1kmLine
+                ? 'Patikrinkite dirbtinės (launch) linijos ir jos jungties su ODF švarumą.'
+                : 'Naudokite pulso slopinimo (launch) kabelį prieš matuojamą liniją - taip pradinė zona bus tiksliai išmatuota.'
         });
     }
 
