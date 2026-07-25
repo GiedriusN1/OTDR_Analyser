@@ -673,8 +673,9 @@ export function renderComp(ok, wls) {
         html += '<td style="font-size:10px">' + attConclusion + '</td></tr>';
         html += '<tr><td>' + t('comp_orl') + '</td>' + dWls.map(w => {
             const v = byWl[w].orl || 0;
-            return '<td class="' + (v < RULES.orl.critical ? 'cmp-worse' : v < RULES.orl.warn ? 'loss-warn' : 'cmp-better') + ' mono">' + v.toFixed(2) + '</td>';
-        }).join('') + '<td style="color:var(--muted);font-size:10px">≥' + RULES.orl.critical + '</td><td style="font-size:10px">' + (dWls.some(w => (byWl[w].orl || 0) < RULES.orl.critical) ? t('comp_bad') : t('comp_ok')) + '</td></tr>';
+            const cls = state.ignoreOrl ? '' : (v < RULES.orl.critical ? 'cmp-worse' : v < RULES.orl.warn ? 'loss-warn' : 'cmp-better');
+            return '<td class="' + cls + ' mono">' + v.toFixed(2) + '</td>';
+        }).join('') + '<td style="color:var(--muted);font-size:10px">≥' + RULES.orl.critical + '</td><td style="font-size:10px">' + (state.ignoreOrl ? t('label_ignore_orl') : (dWls.some(w => (byWl[w].orl || 0) < RULES.orl.critical) ? t('comp_bad') : t('comp_ok'))) + '</td></tr>';
         html += '</tbody></table>';
         if (crossDiags.length) {
             html += '<div style="margin-bottom:6px;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)">' + t('diag_scope_cross_wl') + '</div>';

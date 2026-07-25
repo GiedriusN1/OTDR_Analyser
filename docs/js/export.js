@@ -732,7 +732,7 @@ export async function exportFolderSummaryPdf() {
     // gera bangos ilgio reikšmė nebūtų klaidingai paraudoninama vien todėl, kad
     // TO PATIES matavimo kito rodiklio (pvz. ORL) reikšmė bloga.
     const isAttBad = s => s.avg_attenuation > (RULES.attenuation[s.wavelength] || RULES.attenuation.default).max;
-    const isOrlBad = s => s.orl > 0 && s.orl < RULES.orl.warn;
+    const isOrlBad = s => !state.ignoreOrl && s.orl > 0 && s.orl < RULES.orl.warn;
     const badStyle = { textColor: [190, 30, 30], fontStyle: 'bold' };
 
     const body = [];

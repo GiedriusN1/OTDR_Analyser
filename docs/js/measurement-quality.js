@@ -2,6 +2,7 @@
 // Grynas, be UI: priima parseSOR() rezultatą, grąžina balą + patikrų sąrašą
 // žmogiška kalba. Testuojama atskirai, prieš integruojant į programą.
 import { detectNoiseOnset } from './advanced-diagnostics.js';
+import { state } from './state.js';
 
 // Kiek km toliau nuo deklaruoto galo laikome triukšmo pradžią VIS DAR "tuo
 // pačiu" reiškiniu (natūrali pereiga per galo atspindžio kilimo frontą), o ne
@@ -283,7 +284,9 @@ export function assessMeasurementQuality(sor, has1kmLine = false) {
     const settingsInadequate = !pulseResult.pass || !avgResult.pass;
     const orl = sor.orl || 0;
     const avgAtt = sor.avg_attenuation || 0;
-    const orlLooksBad = orl > 0 && orl < 27; // atitinka RULES.orl.warn likusioje programoje
+    // "Ignoruoti ORL" varnelė - ORL neturi liudyti prieš deklaruoto galo
+    // patikimumą, jei vartotojas jį sąmoningai ignoruoja (žr. diagnostics.js).
+    const orlLooksBad = !state.ignoreOrl && orl > 0 && orl < 27; // atitinka RULES.orl.warn likusioje programoje
     const attLooksElevated = avgAtt > 0.35; // apytikslė bendra riba, nepriklausomai nuo bangos
     const corroboratingEvidence = orlLooksBad || attLooksElevated;
 

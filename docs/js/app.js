@@ -26,6 +26,7 @@ btnNotes.innerHTML = '<i class="ti ti-notes"></i> Pastabos';
 btnPdf.insertAdjacentElement('afterend', btnNotes);
 const chkWdm = document.getElementById('chkWdm');
 const chk1kmLine = document.getElementById('chk1kmLine');
+const chkIgnoreOrl = document.getElementById('chkIgnoreOrl');
 const apiKeyInput = document.getElementById('apiKey');
 const btnSaveKey = document.getElementById('btnSaveKey');
 const btnAiAnalyze = document.getElementById('btnAiAnalyze');
@@ -297,6 +298,19 @@ if (chk1kmLine) {
             state.diagnostics = diagnoseAll(ok);
             renderAll();
             toast(state.has1kmLine ? '1 km linijos režimas įjungtas' : '1 km linijos režimas išjungtas');
+        }
+    });
+}
+
+// ── Ignoruoti ORL (matuojama po movos darbų) ──
+if (chkIgnoreOrl) {
+    chkIgnoreOrl.addEventListener('change', e => {
+        state.ignoreOrl = e.target.checked;
+        if (state.parsed.length) {
+            const ok = state.parsed.filter(p => p.ok);
+            state.diagnostics = diagnoseAll(ok);
+            renderAll();
+            toast(state.ignoreOrl ? t('toast_ignore_orl_on') : t('toast_ignore_orl_off'));
         }
     });
 }

@@ -7,6 +7,7 @@ export const state = {
     activeWls: new Set(),
     hasWdm: false,
 	has1kmLine: false,
+	ignoreOrl: false,
     aiLang: 'lt',
     markerA: 0.08,
     markerB: 0.5,
@@ -31,6 +32,7 @@ export function resetState() {
     state.activeWls = new Set();
     state.hasWdm = false;
 	state.has1kmLine = false;
+	state.ignoreOrl = false;
     state.aiLang = 'lt';
     state.markerA = 0.08;
     state.markerB = 0.92;

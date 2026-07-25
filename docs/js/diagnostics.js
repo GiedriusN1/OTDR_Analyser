@@ -900,7 +900,22 @@ export function diagnoseSingle(sor) {
         : '';
 
     const orl = sor.orl || 0;
-    if (orl > 0 && orl < RULES.orl.critical) {
+    // Vartotojas gali pažymėti "Ignoruoti ORL" (state.ignoreOrl) - dažniausiai
+    // naudinga, kai matuojama iškart po suvirinimo darbų movoje: ORL priklauso
+    // nuo VISOS linijos jungčių/stiklo kokybės (dažnai nešvarios/nekokybiškos
+    // jungtys ar skaidulos defektai KITUR linijoje), ne nuo pačių suvirinimų,
+    // todėl neturėtų vienas nubraukti/pabloginti šio konkretaus darbo balo.
+    // Reikšmė VIS TIEK rodoma (informaciškai), bet sev='info' - balo NEATima
+    // (žr. RULES.quality_score.deductions.info = 0).
+    if (state.ignoreOrl && orl > 0 && orl < RULES.orl.warn) {
+        diags.push({
+            sev: 'info',
+            category: t('diag_orl') + ' ' + formatWavelength(sor.wavelength) + 'nm',
+            msg: t('diag_orl_ignored', { orl: orl.toFixed(2) }),
+            rec: t('rec_none'),
+            weight: 0
+        });
+    } else if (orl > 0 && orl < RULES.orl.critical) {
         // Kuo ORL arčiau kritinės ribos (ne toli už jos), tuo mažesnis baudos
         // svoris - ribinis atvejis (pvz. 1-2 dB už ribos) nėra tokia rimta
         // problema, kaip stipriai už ribos (pvz. 10+ dB už).

@@ -1,4 +1,5 @@
 import { t } from './utils.js';
+import { state } from './state.js';
 
 // ── Skaidulos identifikatoriaus ištraukimas iš failo vardo ──
 export function extractFiberId(filename) {
@@ -31,9 +32,9 @@ export function analyzeCableWide(groups, RULES, formatWavelength, lang = 'lt') {
 
     const labelOf = g => extractFiberId(g.group) || g.group;
 
-    // a) Bendra ORL problema
+    // a) Bendra ORL problema (praleista, jei vartotojas ignoruoja ORL)
     const wlSet = new Set();
-    groups.forEach(g => (g.wavelengths || []).forEach(wl => wlSet.add(wl)));
+    if (!state.ignoreOrl) groups.forEach(g => (g.wavelengths || []).forEach(wl => wlSet.add(wl)));
     wlSet.forEach(wl => {
         const vals = [];
         groups.forEach(g => {
