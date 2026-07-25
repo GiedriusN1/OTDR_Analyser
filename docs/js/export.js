@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { toast, t, getLang, formatWavelength, getClosestStandardWavelength, filterEvents } from './utils.js';
-import { classifyEvent, consolidateEvents } from './diagnostics.js';
+import { classifyEvent, consolidateEvents, stripWavelengthSuffix } from './diagnostics.js';
 import { analyzeCableWide } from './fiber-analysis.js';
 import { apply1kmCorrection } from './utils.js';
 import { RULES } from './rules.js';
@@ -105,7 +105,8 @@ export async function exportExcel() {
     ];
     XLSX.utils.book_append_sheet(wb, diagsSheet, 'Diagnostika');
 
-    XLSX.writeFile(wb, 'otdr_analize.xlsx');
+    const xlsxName = deriveAnalysisName(correctedOk);
+    XLSX.writeFile(wb, (xlsxName || 'otdr_analize') + '.xlsx');
     toast(t('toast_excel_download'));
 }
 
@@ -553,7 +554,8 @@ export async function exportPdf() {
         doc.text(lines, 8, 22);
     }
 
-    doc.save('otdr_analize.pdf');
+    const pdfName = deriveAnalysisName(correctedOk);
+    doc.save((pdfName || 'otdr_analize') + '.pdf');
     toast(t('toast_pdf_download'));
 }
 
@@ -823,12 +825,47 @@ export async function exportFolderSummaryPdf() {
         tableWidth: 'auto'
     });
 
-    const folderName = state.sorDirHandle && state.sorDirHandle.name
-        ? state.sorDirHandle.name.replace(/[\\/:*?"<>|]+/g, '_').trim()
-        : '';
+    const folderName = deriveFolderName();
     const baseName = folderName ? t('folder_pdf_filename', { name: folderName }) : t('folder_pdf_filename_default');
     doc.save(baseName + '.pdf');
     toast(t('folder_pdf_toast_done'));
+}
+
+// ── Failo/aplanko pavadinimo išvedimas eksportuojamiems PDF/Excel failams ──
+function sanitizeFilename(str) {
+    return (str || '').replace(/[\\/:*?"<>|]+/g, '_').trim();
+}
+
+// Aplanko pavadinimas eksportuojamam failui: pirmenybė showDirectoryPicker()
+// suteiktam tikram aplanko vardui (state.sorDirHandle), o jei jo nėra (senesnė
+// naršyklė be File System Access API arba naudotas kitas failų pasirinkimo
+// būdas), bandome jį atkurti iš pasirinktų failų reliatyvaus kelio
+// (webkitRelativePath formos "Aplankas/failas.sor" - žr. parser.js sor.path).
+function deriveFolderName() {
+    if (state.sorDirHandle && state.sorDirHandle.name) {
+        return sanitizeFilename(state.sorDirHandle.name);
+    }
+    const withFolder = state.parsed.find(p => {
+        const rel = (p.path || '').replace(/^__picked__\//, '');
+        return rel.includes('/');
+    });
+    if (withFolder) {
+        const rel = withFolder.path.replace(/^__picked__\//, '');
+        return sanitizeFilename(rel.split('/')[0]);
+    }
+    return '';
+}
+
+// Analizuotos linijos/failų pavadinimas eksportuojamam PDF/Excel failui -
+// bangos ilgio žyma nuimama (stripWavelengthSuffix), kad "sk.3_1310.sor" ir
+// "sk.3_1550.sor" duotų tą patį, bendrą "sk.3" pavadinimą. Jei analizuotos
+// kelios SKIRTINGOS linijos vienu metu (be Aplanko suvestinės), vardai
+// sujungiami (iki 2), likusios suskaičiuojamos.
+function deriveAnalysisName(sors) {
+    const names = [...new Set(sors.map(s => stripWavelengthSuffix(s.file)))];
+    if (!names.length) return '';
+    if (names.length <= 2) return sanitizeFilename(names.join('_ir_'));
+    return sanitizeFilename(names[0]) + '_ir_dar_' + (names.length - 1);
 }
 
 function loadScript(src) {
