@@ -322,3 +322,16 @@ export function detectLaunchArtifactEnd(trace, pulseWidthNs, ior) {
     const endKm = Math.min(MAX_SEARCH_KM, Math.max(formulaFloorKm, MAX_SEARCH_KM * 0.5));
     return { endKm, endM: Math.round(endKm * 1000), formulaFloorKm };
 }
+
+// Realus linijos pasiekiamas atstumas (deklaruotas galas, arba, jei jo nėra,
+// paskutinis įvykis) - NE tas pats, kas sor.range_km (dažnai sąmoningai
+// 1.3-2x didesnis už realų linijos ilgį, dėl atsargos). Naudojama grafiko
+// numatytajam X ašies rėžiui parinkti, kad trasa nebūtų 90% triukšmo uodegos.
+export function estimateReachKm(sor) {
+    const events = sor.events || [];
+    if (!events.length) return sor.range_km || 0;
+    const declaredEnd = events.find(e => e.typeStr && e.typeStr.length > 1 && e.typeStr[1] === 'E');
+    if (declaredEnd) return declaredEnd.distance;
+    const lastEv = events.reduce((a, b) => a.distance > b.distance ? a : b);
+    return lastEv.distance || sor.range_km || 0;
+}

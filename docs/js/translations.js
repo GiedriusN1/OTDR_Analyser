@@ -14,6 +14,8 @@ export const translations = {
         btn_clear: 'Išvalyti viską',
         btn_save_key: 'Išsaugoti',
         btn_reset_ab: 'Atstatyti A/B',
+        btn_full_range: 'Rodyti visą Range',
+        btn_full_range_crop: 'Apkirpti iki galo',
         btn_ai_analyze: 'Analizuoti su Claude',
         btn_ai_analyzing: 'Analizuoja...',
         // Tabs
@@ -280,6 +282,8 @@ export const translations = {
         btn_clear: 'Clear all',
         btn_save_key: 'Save',
         btn_reset_ab: 'Reset A/B',
+        btn_full_range: 'Show full Range',
+        btn_full_range_crop: 'Crop to line end',
         btn_ai_analyze: 'Analyze with Claude',
         btn_ai_analyzing: 'Analyzing...',
         // Tabs

@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { WL_COLORS } from './config.js';
-import { t, apply1kmCorrection, filterEvents, formatWavelength, getClosestStandardWavelength } from './utils.js';
+import { t, apply1kmCorrection, filterEvents, formatWavelength, getClosestStandardWavelength, estimateReachKm } from './utils.js';
 import { classifyEvent, consolidateEvents } from './diagnostics.js';
 import { detectGhostReflections } from './advanced-diagnostics.js';
 
@@ -9,6 +9,11 @@ let traceChartInstance = null;
 // naudojama pelės užvedimo tooltip'ui (žr. setupOverlay). Perrašoma kiekvieną
 // kartą perpiešiant, kad visada atspindėtų DABARTINES ekrano koordinates.
 let ghostHitRegions = [];
+// Ar rodyti visą matavimo Range (įskaitant triukšmo uodegą už linijos galo),
+// ar tik numatytąjį, apkirptą vaizdą iki deklaruoto galo. Sąmoningai
+// modulio lygmens (ne per-analizės), kad pasirinkimas išliktų per
+// perpiešimus tos pačios sesijos metu (varnelių perjungimą ir pan.).
+let showFullRange = false;
 
 export function getTraceChart() {
     return traceChartInstance;
@@ -20,6 +25,16 @@ export function setupTraceChart(ok) {
         traceChartInstance.destroy();
         traceChartInstance = null;
     }
+
+    // Numatytasis X ašies rėžis - apkerpame iki deklaruoto linijos galo (+
+    // atsarga), kad grafikas iš karto nebūtų 80-90% triukšmo uodegos už
+    // realios linijos (dažnas atvejis, kai Range nustatytas su didele
+    // atsarga). "Rodyti visą Range" mygtukas (žr. setupOverlay) leidžia
+    // grįžti prie pilno vaizdo, jei reikia patikrinti uodegą.
+    const maxReachKm = ok.length ? Math.max(0, ...ok.map(estimateReachKm)) : 0;
+    const defaultXMax = (!showFullRange && maxReachKm > 0)
+        ? Math.max(maxReachKm * 1.15, maxReachKm + 0.1)
+        : undefined;
 
     traceChartInstance = new Chart(ctx, {
         type: 'scatter',
@@ -56,6 +71,7 @@ export function setupTraceChart(ok) {
             scales: {
                 x: {
                     type: 'linear',
+                    max: defaultXMax,
                     ticks: { color: '#7a8099', font: { size: 13, family: 'JetBrains Mono' } },
                     grid: { color: 'rgba(255,255,255,0.05)' },
                     title: { display: true, text: t('chart_x_axis'), color: '#7a8099', font: { size: 12 } }
@@ -448,5 +464,19 @@ export function setupOverlay(ok) {
     document.getElementById('btnResetAB').onclick = () => { state.markerA = 0.08;
         state.markerB = 0.92;
         drawOverlay(); };
+    const btnFullRange = document.getElementById('btnFullRange');
+    if (btnFullRange) {
+        const updateLabel = () => {
+            const span = btnFullRange.querySelector('[data-i18n]');
+            const key = showFullRange ? 'btn_full_range_crop' : 'btn_full_range';
+            if (span) { span.dataset.i18n = key; span.textContent = t(key); }
+        };
+        updateLabel();
+        btnFullRange.onclick = () => {
+            showFullRange = !showFullRange;
+            setupTraceChart(ok);
+            updateLabel();
+        };
+    }
     window.addEventListener('resize', () => setTimeout(drawOverlay, 60));
 }
