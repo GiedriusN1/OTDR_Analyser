@@ -735,16 +735,32 @@ export async function exportFolderSummaryPdf() {
     const isOrlBad = s => !state.ignoreOrl && s.orl > 0 && s.orl < RULES.orl.warn;
     const badStyle = { textColor: [190, 30, 30], fontStyle: 'bold' };
 
+    // Trumpas, konkretus vienos problemos apibūdinimas suvestinės lentelei:
+    // ištraukiame pirmą "X dB"/"X dB/km" reikšmę iš pilno pranešimo (msg) ir
+    // sujungiame su jau esančia, trumpa category eilute (ji dažniausiai jau
+    // turi atstumą/vietą, žr. "@ X km" formatą) - konkrečiau nei vien
+    // "Kritinės: N, įspėjimai: M" skaičius, bet nereikia rašyti atskiro
+    // formatuotojo kiekvienam diagnostikos tipui atskirai.
+    const MAX_ISSUE_LINES = 4;
+    function issueLine(d) {
+        const valMatch = (d.msg || '').match(/(-?[\d.]+\s*dB(?:\/km)?)/);
+        const label = stripEmojiForPdf(d.category);
+        return valMatch ? (valMatch[1] + ' — ' + label) : label;
+    }
+
     const body = [];
     sorted.forEach((g, i) => {
         const wlStats = Object.values(g.stats || {}).sort((a, b) => a.wavelength - b.wavelength);
         const n = Math.max(1, wlStats.length);
         const allD = [...(g.cross_wl || []), ...Object.values(g.per_file || {}).flat()];
-        const critCount = allD.filter(d => d.sev === 'critical').length;
-        const warnCount = allD.filter(d => d.sev === 'warning').length;
-        const topIssue = allD.find(d => d.sev === 'critical') || allD.find(d => d.sev === 'warning');
-        const issuesText = (critCount || warnCount)
-            ? (t('folder_pdf_issues_text', { crit: critCount, warn: warnCount }) + (topIssue ? ('\n' + stripEmojiForPdf(topIssue.category)) : ''))
+        const critWarn = allD.filter(d => d.sev === 'critical' || d.sev === 'warning');
+        const critCount = critWarn.filter(d => d.sev === 'critical').length;
+        const warnCount = critWarn.length - critCount;
+        const shown = critWarn.slice(0, MAX_ISSUE_LINES).map(issueLine);
+        const moreCount = critWarn.length - shown.length;
+        const issuesText = critWarn.length
+            ? (t('folder_pdf_issues_text', { crit: critCount, warn: warnCount }) + '\n' + shown.join('\n') +
+               (moreCount > 0 ? '\n' + t('folder_pdf_issues_more', { n: moreCount }) : ''))
             : t('folder_pdf_no_issues');
 
         const wlRows = wlStats.length ? wlStats.map(s => ([

@@ -6,7 +6,7 @@ export const translations = {
         // Buttons
         btn_excel: 'Excel',
         btn_pdf: 'PDF',
-        btn_folder_pdf: 'Aplanko PDF',
+        btn_folder_pdf: 'Esminis PDF',
         btn_analyze: 'Analizuoti',
         btn_analyzing: 'Analizuoja...',
         btn_files: 'Failai',
@@ -245,8 +245,8 @@ export const translations = {
 		label_diag_file: 'Failas',
 		label_diag_problem: 'Problema',
 		label_diag_recommendation: 'Rekomendacija',
-        // Aplanko suvestinės PDF
-        folder_pdf_title: 'Aplanko suvestinė',
+        // Esminė (aplanko arba pavienių failų) suvestinės PDF
+        folder_pdf_title: 'Esminė suvestinė',
         folder_pdf_lines_count: 'linijos/skaidulos',
         folder_pdf_col_nr: 'Nr.',
         folder_pdf_col_line: 'Linija',
@@ -260,12 +260,13 @@ export const translations = {
         folder_pdf_col_quality: 'Matavimo kokybė',
         folder_pdf_col_issues: 'Pagrindinės problemos',
         folder_pdf_issues_text: 'Kritinės: {crit}, įspėjimai: {warn}',
+        folder_pdf_issues_more: '+{n} daugiau',
         folder_pdf_no_issues: 'Nėra problemų',
         folder_pdf_quality_merged: 'Matavimo kokybė (visoms linijoms vienoda): {note}',
         folder_pdf_filename: 'Aplanko_{name}_suvestinė',
-        folder_pdf_filename_default: 'Aplanko_suvestinė',
+        folder_pdf_filename_default: 'Esminis_suvestinė',
         folder_pdf_toast_empty: 'Nėra išanalizuotų failų suvestinei',
-        folder_pdf_toast_done: 'Aplanko suvestinės PDF atsisiųstas',
+        folder_pdf_toast_done: 'Esminė suvestinės PDF atsisiųstas',
     },
 
 
@@ -277,7 +278,7 @@ export const translations = {
         // Buttons
         btn_excel: 'Excel',
         btn_pdf: 'PDF',
-        btn_folder_pdf: 'Folder PDF',
+        btn_folder_pdf: 'Essential PDF',
         btn_analyze: 'Analyze',
         btn_analyzing: 'Analyzing...',
         btn_files: 'Files',
@@ -517,8 +518,8 @@ export const translations = {
 		label_diag_file: 'File',
 		label_diag_problem: 'Problem',
 		label_diag_recommendation: 'Recommendation',
-        // Folder summary PDF
-        folder_pdf_title: 'Folder Summary',
+        // Essential (folder or single-file) summary PDF
+        folder_pdf_title: 'Essential Summary',
         folder_pdf_lines_count: 'lines/fibers',
         folder_pdf_col_nr: 'No.',
         folder_pdf_col_line: 'Line',
@@ -532,11 +533,12 @@ export const translations = {
         folder_pdf_col_quality: 'Measurement quality',
         folder_pdf_col_issues: 'Main issues',
         folder_pdf_issues_text: 'Critical: {crit}, warnings: {warn}',
+        folder_pdf_issues_more: '+{n} more',
         folder_pdf_no_issues: 'No issues',
         folder_pdf_quality_merged: 'Measurement quality (same for all lines): {note}',
         folder_pdf_filename: 'Folder_{name}_Summary',
-        folder_pdf_filename_default: 'Folder_Summary',
+        folder_pdf_filename_default: 'Essential_Summary',
         folder_pdf_toast_empty: 'No analyzed files for the summary',
-        folder_pdf_toast_done: 'Folder summary PDF downloaded',
+        folder_pdf_toast_done: 'Essential summary PDF downloaded',
     }
 };

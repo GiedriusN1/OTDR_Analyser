@@ -676,7 +676,7 @@ function _segmentsToDiagsFixed(segments, lim, wl, dzEnd) {
         switch (cat) {
             case 'catastrophic':
                 sev = 'critical';
-                catLabel = '💀 Kritinis pažeidimas';
+                catLabel = '💀 Katastrofiškas slopinimas';
                 msg = 'Ruože ' + loc + ' slopinimas ' + att.toFixed(2) + ' dB/km — ' +
                       (att / lim.max).toFixed(1) + '× viršija normą (' + lim.max + ' dB/km prie ' + wl + ' nm). ' +
                       'Tikėtinas mechaninis kabelio pažeidimas, įtempimas arba lūžis.';
