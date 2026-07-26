@@ -626,6 +626,22 @@ function detectVaryingFiberInfo(names) {
     return result;
 }
 
+// Kai grupių daug (>2), bet jų pavadinimai turi bendrą "šabloną" su vienu
+// besikeičiančiu skaičiumi (pvz. "... sk.1", "... sk.2", "... sk.3" - tas
+// pats varyingInfo mechanizmas, naudojamas eilučių rikiavimui aukščiau),
+// vardą vis tiek galima sudaryti iš failų vardų (bendra dalis kartą + visų
+// skaičių sąrašas), o ne kristi tiesiai į Aplanko/numatytąjį vardą. Grąžina
+// '', jei pavadinimai nesidalija bendru šablonu (tikrai skirtingos linijos).
+function deriveCompactGroupName(names) {
+    if (names.length < 2) return '';
+    const varyingInfo = detectVaryingFiberInfo(names);
+    if (varyingInfo.size !== names.length) return '';
+    const base = varyingInfo.get(names[0]).base;
+    if (!names.every(n => varyingInfo.get(n).base === base)) return '';
+    const nums = names.map(n => varyingInfo.get(n).number).sort((a, b) => a - b);
+    return sanitizeFilename(base + nums.join('_'));
+}
+
 // Skaidulos numerio ištraukimas iš linijos pavadinimo (rūšiavimui): pirmiausia
 // žinomi žymėjimai, tada kintantis skaičius rinkinyje (žr. detectVaryingFiberInfo),
 // o jei nieko nerasta - paskutinis arba pirmasis pavadinime esantis skaičius.
@@ -852,7 +868,12 @@ export async function exportFolderSummaryPdf() {
     const folderName = deriveFolderName();
     let baseName;
     if (distinctNames.length > 2) {
-        baseName = folderName ? t('folder_pdf_filename', { name: folderName }) : t('folder_pdf_filename_default');
+        const compact = deriveCompactGroupName(distinctNames);
+        if (compact) {
+            baseName = t('folder_pdf_filename_analysis', { name: compact });
+        } else {
+            baseName = folderName ? t('folder_pdf_filename', { name: folderName }) : t('folder_pdf_filename_default');
+        }
     } else {
         const analysisName = deriveAnalysisName(allSors);
         // Aplanko vardas prisegamas prie failų vardų, kad "sk.3"/"sk.4" tipo,
