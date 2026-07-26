@@ -841,8 +841,27 @@ export async function exportFolderSummaryPdf() {
         tableWidth: 'auto'
     });
 
+    // Vardas generuojamas taip pat kaip detaliam PDF (deriveAnalysisName) - bet
+    // tik kai analizuota nedaug skirtingų linijų (kaip ir detaliam PDF atveju,
+    // dažniausiai 1 linija keliomis bangomis). Jei per "Aplankas" įkelta daug
+    // skirtingai pavadintų linijų vienu metu (neįprastas Esminio PDF naudojimo
+    // būdas - normaliai tai atskiri matavimai, ne viena suvestinė), vardų
+    // vardinimas eilute taptų beprasmis, todėl grįžtama prie Aplanko pavadinimo.
+    const allSors = groups.flatMap(g => Object.values(g.sors || {}));
+    const distinctNames = [...new Set(allSors.map(s => stripWavelengthSuffix(s.file)))];
     const folderName = deriveFolderName();
-    const baseName = folderName ? t('folder_pdf_filename', { name: folderName }) : t('folder_pdf_filename_default');
+    let baseName;
+    if (distinctNames.length > 2) {
+        baseName = folderName ? t('folder_pdf_filename', { name: folderName }) : t('folder_pdf_filename_default');
+    } else {
+        const analysisName = deriveAnalysisName(allSors);
+        // Aplanko vardas prisegamas prie failų vardų, kad "sk.3"/"sk.4" tipo,
+        // savaime nelabai informatyvūs, splice'ų numeriai liktų susieti su
+        // projekto/kabelio vardu - nebent aplanko vardas jau ir taip įeina į
+        // failų vardą (pvz. failas jau vadinasi "2_KS3L_Paobelys"), tada nekartojame.
+        const combined = (folderName && !analysisName.includes(folderName)) ? (analysisName + '_' + folderName) : analysisName;
+        baseName = t('folder_pdf_filename_analysis', { name: combined });
+    }
     doc.save(baseName + '.pdf');
     toast(t('folder_pdf_toast_done'));
 }
