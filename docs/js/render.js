@@ -754,9 +754,10 @@ export function renderEventStrip(ok) {
 		}
 
 		const wlSpans = showWavelength
-			? [...new Set(g.events.map(e => e.wl))].sort().map(wl =>
-				'<span style="font-size:8px;background:' + WL_COLORS[wl] + '22;color:' + WL_COLORS[wl] + ';padding:1px 4px;border-radius:3px">' + formatWavelength(wl) + 'nm</span>'
-			  ).join(' ')
+			? [...new Set(g.events.map(e => e.wl))].sort().map(wl => {
+				const wc = WL_COLORS[getClosestStandardWavelength(wl)] || '#888';
+				return '<span style="font-size:8px;background:' + wc + '22;color:' + wc + ';padding:1px 4px;border-radius:3px">' + formatWavelength(wl) + 'nm</span>';
+			  }).join(' ')
 			: '';
 
 		const wlInfo = showWavelength
@@ -779,7 +780,7 @@ export function renderEventStrip(ok) {
         const evRefsJson = JSON.stringify(g.events.map(e => ({ file: e.file, index: e.index })));
         html += '<div class="ev-node" data-tip="' + escapeHtml(tipStr) + '">';
         html += '<div class="ev-num">#' + (gi + 1) + '</div>';
-        html += '<div class="ev-icon ' + type + '" style="position:relative;">' + ICONS[type] +
+        html += '<div class="ev-icon ' + type + '" style="position:relative;">' + (ICONS[type] || ICONS.other) +
             '<select class="ev-tag ' + type + ' ev-type-select-strip" data-refs="' + escapeHtml(evRefsJson) + '" title="' + (STRIP_TYPE_LABELS[type] || type) + '" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:none;">' +
             EVENT_TYPES.map(ty => '<option value="' + ty + '"' + (ty === type ? ' selected' : '') + '>' + (STRIP_TYPE_LABELS[ty] || ty) + '</option>').join('') +
             '</select></div>';
