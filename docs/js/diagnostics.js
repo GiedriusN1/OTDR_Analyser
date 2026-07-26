@@ -100,7 +100,7 @@ export function describeEndOfFiber(refl) {
     if (refl > -20) {
         return {
             label: 'Atviras kabelio galas su PC jungtimi',
-            detail: 'Stiprus atspindys (' + refl.toFixed(1) + ' dB) būdingas PC (physical contact) jungčiai be indekso derinimo skysčio - tikėtina atviras, neprijungtas kabelio galas su PC jungtimi.',
+            detail: 'Stiprus atspindys (' + refl.toFixed(1) + ' dB) būdingas atviram, neprijungtam PC (physical contact) tipo jungties galui.',
         };
     }
     if (refl > -30) {
