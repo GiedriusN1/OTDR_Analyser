@@ -6,6 +6,7 @@ export const state = {
     diagnostics: [],    // diagnosis groups
     activeWls: new Set(),
     hasWdm: false,
+	hasPon: false,
 	has1kmLine: false,
 	ignoreOrl: false,
     aiLang: 'lt',
@@ -31,6 +32,7 @@ export function resetState() {
     state.diagnostics = [];
     state.activeWls = new Set();
     state.hasWdm = false;
+	state.hasPon = false;
 	state.has1kmLine = false;
 	state.ignoreOrl = false;
     state.aiLang = 'lt';

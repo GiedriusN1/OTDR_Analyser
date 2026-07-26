@@ -90,9 +90,13 @@
                 <!-- Options -->
 				<div class="tb-section center-section">
 					<h2 data-i18n="label_options">Parinktys</h2>
-					<label class="flex-center label-sm">
+					<label class="flex-center label-sm" title="WDM įranga (MUX/OADM) - visada montuojama per jungtį, net žalią APC. Naudokite šią varnelę, jei linijoje YRA tokia jungtimi montuojama įranga.">
 						<input type="checkbox" id="chkWdm" style="accent-color:var(--blue);" />
-						<span data-i18n="label_wdm">Linijoje yra WDM / PON</span>
+						<span data-i18n="label_wdm">Yra WDM</span>
+					</label>
+					<label class="flex-center label-sm" style="margin-top:2px;" title="PON splitteris - visada suvirinamas (be jungties), tad neturi atspindžio. Naudokite šią varnelę, jei linijoje YRA suvirintas dalijimo (splitter) taškas.">
+						<input type="checkbox" id="chkPon" style="accent-color:var(--blue);" />
+						<span data-i18n="label_pon">Yra PON splitteris</span>
 					</label>
 					<!-- 👇 NAUJA VARNELÒ -->
 					<label class="flex-center label-sm" style="margin-top:2px;">

@@ -179,14 +179,31 @@ export function commentForEvent(ev, type, macrobendMatch) {
     }
 }
 
+// Ar nuostolis atitinka kurį nors žinomą PON splitterio dalijimo santykį
+// (1:2, 1:4 ... 1:64), su kiekvienam santykiui apibrėžta tolerancija.
+function matchesPonSplitterRatio(loss) {
+    const ratios = RULES.diagnostics.pon_splitter.ratios;
+    return Object.values(ratios).some(cfg => Math.abs(loss - cfg.loss) <= cfg.tol);
+}
+
 export function classifyEvent(ev, allEvents = null, rangeKm = null) {
+    // Rankinis vartotojo perrašymas (Event'ų tab'o tipo pasirinkimas, arba
+    // importuotas iš .notes.json) VISADA turi viršenybę prieš bet kokią
+    // automatinę klasifikaciją - kitaip perrašymas būdavo įrašomas į event'o
+    // objektą (ir net teisingai eksportuojamas į .notes.json), bet kiekvieno
+    // perpiešimo metu classifyEvent() jį tiesiog ignoruodavo ir vėl
+    // paskaičiuodavo automatinį tipą, todėl pasirinkimas niekada realiai
+    // "neprisiimdavo" - vartotojui atrodydavo, kad perrašymas neveikia.
+    if (ev._overrideType) return ev._overrideType;
+
     const tStr = ev.typeStr || '';
     const cLow = (ev.comments || '').toLowerCase();
     const isWdmKeyword = RULES.wdm.keywords.some(k => cLow.includes(k));
     // E6 patch: pašalintas nenaudojamas 'noRefl' kintamasis (buvo priskiriamas,
     // bet niekur toliau šioje funkcijoje neskaitomas - negyvas kodas).
-    const wdmMax = state.hasWdm ? 25.0 : RULES.wdm.loss_max;
-    const wdmMin = state.hasWdm ? 1.5 : RULES.wdm.loss_min;
+    const wdmRangeActive = state.hasWdm || state.hasPon;
+    const wdmMax = wdmRangeActive ? 25.0 : RULES.wdm.loss_max;
+    const wdmMin = wdmRangeActive ? 1.5 : RULES.wdm.loss_min;
 
     const loss = Math.abs(ev.loss);
     const refl = ev.refl || 0;
@@ -201,21 +218,19 @@ export function classifyEvent(ev, allEvents = null, rangeKm = null) {
     if (allEvents && rangeKm && isRealEndOfFiber(ev, allEvents, rangeKm)) {
         return 'end';
     }
-/*
-    // 3) WDM / PON splitter – SUGRIEŽTINTA
+    // 3) WDM / PON splitter. WDM įranga (net žali APC) VISADA montuojama per
+    // jungtį - jungtis fiziškai negali turėti refl=0 (žr. 4 punktą žemiau dėl
+    // tos pačios logikos suvirinimams). PON splitteris - VISADA suvirinamas,
+    // tad neturi atspindžio, o jo nuostolis atitinka žinomą dalijimo santykį
+    // (RULES.diagnostics.pon_splitter.ratios). Anksčiau abu buvo viename
+    // "bet koks nuostolis šiame diapazone = WDM" krepšyje, visai neatsižvelgiant
+    // į atspindį - todėl suvirinimas/nežinoma anomalija be atspindžio, bet su
+    // "WDM diapazono" nuostoliu, būdavo klaidingai nutildoma kaip "tai WDM".
     if (loss >= wdmMin && loss <= wdmMax) {
-        // Aiškus komentaras – visada WDM
         if (isWdmKeyword) return 'wdm';
-        // Tik jei vartotojas patvirtino WDM
-        if (state.hasWdm && (refl < -45 || loss > 3.5)) return 'wdm';
-        // Kitu atveju – ne WDM, tęsiame
+        if (state.hasWdm && refl !== 0) return 'wdm';
+        if (state.hasPon && refl === 0 && matchesPonSplitterRatio(loss)) return 'wdm';
     }
-*/
-	// 3) WDM / PON splitter – supaprastinat, kai pažymėta WDM varnelė
-	if (loss >= wdmMin && loss <= wdmMax) {
-    if (isWdmKeyword) return 'wdm';
-    if (state.hasWdm) return 'wdm';
-	}
 
     // 4) Neatspindintys įvykiai. SVARBU: tikras suvirinimas (stiklo-stiklo
     // sandūra) fiziškai NEGALI turėti Frenelio atspindžio, todėl SOR faile

@@ -25,6 +25,7 @@ btnNotes.title = 'Eksportuoti eventų perrašymus ir pastabas kaip .notes.json';
 btnNotes.innerHTML = '<i class="ti ti-notes"></i> Pastabos';
 btnPdf.insertAdjacentElement('afterend', btnNotes);
 const chkWdm = document.getElementById('chkWdm');
+const chkPon = document.getElementById('chkPon');
 const chk1kmLine = document.getElementById('chk1kmLine');
 const chkIgnoreOrl = document.getElementById('chkIgnoreOrl');
 const apiKeyInput = document.getElementById('apiKey');
@@ -286,6 +287,18 @@ chkWdm.addEventListener('change', e => {
         toast(state.hasWdm ? t('toast_wdm_on') : t('toast_wdm_off'));
     }
 });
+
+// ── PON splitteris ──
+if (chkPon) {
+    chkPon.addEventListener('change', e => {
+        state.hasPon = e.target.checked;
+        if (state.parsed.length) {
+            state.diagnostics = diagnoseAll(state.parsed.filter(p => p.ok));
+            renderAll();
+            toast(state.hasPon ? t('toast_pon_on') : t('toast_pon_off'));
+        }
+    });
+}
 
 // ── 1 km dirbtinė linija ──
 
