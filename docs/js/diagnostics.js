@@ -165,6 +165,20 @@ export function commentForEvent(ev, type, macrobendMatch) {
         }
         case 'splice':
         default: {
+            // Jei YRA išmatuotas atspindys, šis taškas fiziškai NEGALI būti
+            // tikras suvirinimas (tas pats principas kaip classifyEvent -
+            // tikra stiklo-stiklo sandūra atspindžio neduoda). Tai gali
+            // nutikti, kai tipas liko 'splice'/'event' (pvz. neaiški WDM/PON
+            // signatūra arba rankinis perrašymas į bendrinį tipą) - tokiu
+            // atveju rekomendacija NETURI aklai siūlyti "pervirinti movoje",
+            // nes tai jungties, ne suvirinimo, taškas.
+            if (refl !== 0) {
+                const reflNote = ' Pastaba: šis taškas turi išmatuotą atspindį (' + refl.toFixed(1) + ' dB) - tai jungties, ne suvirinimo, požymis (tikras suvirinimas atspindžio neturėtų). Konkreti jungties paskirtis neaiški (gali būti tarpinė jungtis/ODF, ne WDM/PON) - jei žinote, koks tai taškas, perrašykite tipą rankiniu būdu.';
+                if (loss > RULES.splice.critical) {
+                    return 'Padidėjęs nuostolis (' + loss.toFixed(3) + ' dB) jungties taške.' + reflNote;
+                }
+                return 'Jungties taškas, nuostolis (' + loss.toFixed(3) + ' dB) normos ribose.' + reflNote;
+            }
             if (loss > RULES.splice.critical) {
                 return 'Didelis suvirinimo nuostolis (' + loss.toFixed(3) + ' dB, norma ≤ ' + RULES.splice.critical + ' dB) - rekomenduojama pervirinti movoje.';
             }
