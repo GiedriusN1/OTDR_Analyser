@@ -212,9 +212,12 @@ export function renderOverview(ok, wls) {
     const avgScore = state.diagnostics.reduce((s, g) => s + g.score, 0) / Math.max(state.diagnostics.length, 1);
     const grade = RULES.quality_score.grades.find(g => avgScore >= g.min);
 
+    const avgLengthKm = state.diagnostics.reduce((s, g) => s + (g.lengthKm || 0), 0) / Math.max(state.diagnostics.length, 1);
+
     document.getElementById('ovMetrics').innerHTML =
         '<div class="mc teal"><div class="lbl">' + t('metrics_files') + '</div><div class="val">' + ok.length + '</div></div>' +
         '<div class="mc blue"><div class="lbl">' + t('metrics_wavelengths') + '</div><div class="val" style="font-size:13px">' + wls.map(w => formatWavelength(w)).join('/') + ' <span class="unit">' + t('unit_nm') + '</span></div></div>' +
+        '<div class="mc"><div class="lbl">' + t('metrics_length') + '</div><div class="val">' + avgLengthKm.toFixed(3) + '<span class="unit"> ' + t('unit_km') + '</span></div></div>' +
         '<div class="mc"><div class="lbl" title="Visų įkeltų failų bendro (ne dB/km) nuostolio vidurkis">Bendras nuostolis (vid.)' + (ok.some(p => p.total_loss_covers_full_line === false) ? ' <span title="' + t('label_calculated_loss_hint') + '" style="cursor:help">✱</span>' : '') + '</div><div class="val">' + (ok.reduce((s, p) => s + effectiveTotalLoss(p), 0) / ok.length).toFixed(2) + '<span class="unit"> ' + t('unit_dB') + '</span></div></div>' +
         '<div class="mc red"><div class="lbl">' + t('metrics_critical') + '</div><div class="val">' + crit + '</div></div>' +
         '<div class="mc orange"><div class="lbl">' + t('metrics_warnings') + '</div><div class="val">' + warn + '</div></div>' +

@@ -76,6 +76,7 @@ export const translations = {
         // Metrics
         metrics_files: 'Failai',
         metrics_wavelengths: 'Bangos ilgiai',
+        metrics_length: 'Linijos ilgis',
         metrics_avg_loss: 'Vid. nuostoliai',
         metrics_critical: 'Kritiniai',
         metrics_warnings: 'Įspėjimai',
@@ -349,6 +350,7 @@ export const translations = {
         // Metrics
         metrics_files: 'Files',
         metrics_wavelengths: 'Wavelengths',
+        metrics_length: 'Total length',
         metrics_avg_loss: 'Avg. loss',
         metrics_critical: 'Critical',
         metrics_warnings: 'Warnings',
