@@ -369,7 +369,11 @@ export function drawOverlay() {
         yB2 = yAtX(bKm);
     const dist = Math.abs(bKm - aKm);
     const loss = (yA - yB2).toFixed(3);
-    const att2 = dist > 0 ? (Math.abs(yA - yB2) / dist).toFixed(3) : '—';
+    // Ženklas NEnuimamas (be Math.abs) - kad "gainerio" (dirbtinio pelno dėl
+    // skirtingo atgalinio sklaidos koeficiento sandūroje) ruožas rodytų
+    // NEIGIAMĄ dB/km, atitinkantį neigiamą dB nuostolį, o ne klaidinantį
+    // didelį TEIGIAMĄ "slopinimą".
+    const att2 = dist > 0 ? ((yA - yB2) / dist).toFixed(3) : '—';
 
     const el = document.getElementById('abLoss');
     if (el) {

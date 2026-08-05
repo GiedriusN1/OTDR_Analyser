@@ -933,6 +933,13 @@ export function diagnoseSingle(sor) {
     const orlShortLineNote = (lineLenKm > 0 && lineLenKm < 10)
         ? ' (Pastaba: tai ~' + lineLenKm.toFixed(1) + ' km linija - trumpose linijose ORL natūraliai prastesnis dėl mažesnio backscatter kiekio, nepriklausomai nuo jungčių kokybės; standarto riba tam išimčių nedaro.)'
         : '';
+    // Ta pati logika (informacinis kontekstas, riba NEKEIČIAMA), bet dėl bangos
+    // ilgio: Rayleigh sklaida priklauso nuo λ⁻⁴, todėl 1310nm skaidula grąžina
+    // daugiau foninio backscatter net esant identiškai jungčių kokybei kaip
+    // 1550/1625nm - ORL ties 1310nm todėl būna keliais dB prastesnis vien dėl to.
+    const orlWavelengthNote = (wl === 1310)
+        ? ' (Pastaba: 1310 nm bangoje Rayleigh sklaida stipresnė nei 1550/1625 nm, todėl ORL šioje bangoje natūraliai būna keliais dB prastesnis, nepriklausomai nuo jungčių kokybės.)'
+        : '';
 
     const orl = sor.orl || 0;
     // Vartotojas gali pažymėti "Ignoruoti ORL" (state.ignoreOrl) - dažniausiai
@@ -958,7 +965,7 @@ export function diagnoseSingle(sor) {
         diags.push({
             sev: 'critical',
             category: t('diag_orl') + ' ' + formatWavelength(sor.wavelength) + 'nm',
-            msg: t('diag_orl_critical', { orl: orl.toFixed(2), critical: RULES.orl.critical }) + orlShortLineNote,
+            msg: t('diag_orl_critical', { orl: orl.toFixed(2), critical: RULES.orl.critical }) + orlShortLineNote + orlWavelengthNote,
             rec: t('rec_check_connectors'),
             weight
         });
@@ -967,7 +974,7 @@ export function diagnoseSingle(sor) {
         diags.push({
             sev: 'warning',
             category: t('diag_orl') + ' ' + formatWavelength(sor.wavelength) + 'nm',
-            msg: t('diag_orl_warning', { orl: orl.toFixed(2), warn: RULES.orl.warn }) + orlShortLineNote,
+            msg: t('diag_orl_warning', { orl: orl.toFixed(2), warn: RULES.orl.warn }) + orlShortLineNote + orlWavelengthNote,
             rec: t('rec_clean_connectors'),
             weight
         });

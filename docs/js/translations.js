@@ -222,6 +222,10 @@ export const translations = {
 		cable_common_orl_msg: 'Visose ({count}) analizuotose skaidulose ORL panašiai žemas ({min}–{max} dB, norma ≥ {warn} dB) ties {wl} nm: {labels}. Kadangi ODF jungtis kiekvienai skaidulai skirtinga, o rezultatas panašus visose — tikėtina bendra priežastis paties OTDR prijungimo pusėje (matavimo patch cord ar OTDR portas), o ne kiekvienos skaidulos individualus defektas.',
 		cable_common_orl_rec: 'Patikrinti OTDR matavimo patch cord (jungtį tarp OTDR ir matuojamos linijos) — ne kiekvienos skaidulos ODF adapterį atskirai.',
 
+		cable_orl_unbalanced_title: '⚠️ Nevienodas ORL tarp skaidulų',
+		cable_orl_unbalanced_msg: 'Tarp {count} analizuotų skaidulų ORL smarkiai skiriasi ties {wl} nm — {delta} dB skirtumas ({min}–{max} dB, norma ≥ {warn} dB): {labels}. Kadangi kitos skaidulos rodo gerą ORL, o {worst} — žymiai prastesnį, labiausiai tikėtina konkrečios šios skaidulos ODF/pigtail jungties problema, ne bendra OTDR prijungimo priežastis.',
+		cable_orl_unbalanced_rec: 'Patikrinti ir nuvalyti prasčiausią ORL rodančios skaidulos ODF adapterį/pigtail — kitų skaidulų jungtys tikėtina tvarkingos.',
+
 		cable_shared_damage_title: 'Galimai bendras pažeidimas keliose skaidulose ~{pos} km',
 		cable_shared_damage_msg: 'Ruože apie {pos} km pažeidimas aptiktas skaidulose: {affected}. Skaidulose {unaffected} šioje vietoje pažeidimo nėra. Kadangi pažeidimas nesikartoja visose kabelio skaidulose, tikėtina, kad tai konkrečios skaidulos ar mikromodulio (tūbelės) pažeidimas.',
 		cable_shared_damage_rec: 'Patikrinti, ar paveiktos skaidulos yra tame pačiame kabelio mikromodulyje/tūbelėje — jei taip, tikėtinas lokalus tos tūbelės pažeidimas.',
@@ -496,6 +500,10 @@ export const translations = {
 		cable_common_orl_title: '🔌 Common connector issue',
 		cable_common_orl_msg: 'All ({count}) analyzed fibers show a similarly low ORL ({min}–{max} dB, spec ≥ {warn} dB) at {wl} nm: {labels}. Since each fiber has its own ODF adapter, but the result is similar across all — a shared cause on the OTDR connection side (measurement patch cord or OTDR port) is more likely.',
 		cable_common_orl_rec: 'Check the OTDR measurement patch cord (connection between the OTDR and the line under test) — not the individual ODF adapter of each fiber.',
+
+		cable_orl_unbalanced_title: '⚠️ Uneven ORL between fibers',
+		cable_orl_unbalanced_msg: 'ORL varies significantly between the {count} analyzed fibers at {wl} nm — a {delta} dB spread ({min}–{max} dB, spec ≥ {warn} dB): {labels}. Since other fibers show good ORL while {worst} is notably worse, the issue is more likely in that specific fiber\'s ODF/pigtail connector rather than a shared OTDR connection cause.',
+		cable_orl_unbalanced_rec: 'Check and clean the ODF adapter/pigtail of the fiber with the worst ORL — other fibers\' connectors are likely fine.',
 
 		cable_shared_damage_title: 'Possible shared damage across multiple fibers ~{pos} km',
 		cable_shared_damage_msg: 'Around {pos} km, damage was detected in fibers: {affected}. Fibers {unaffected} show no damage at this location. Since the damage does not repeat across all fibers of the cable, it is likely specific to a fiber or sub-unit (tube).',

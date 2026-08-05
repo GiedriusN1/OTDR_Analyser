@@ -19,12 +19,6 @@ function _parseSegmentRange(category) {
     return { start: parseFloat(m[1]), end: parseFloat(m[2]) };
 }
 
-function _parseOrlFromMsg(msg) {
-    if (!msg) return null;
-    const m = msg.match(/([\d.]+)\s*dB/);
-    return m ? parseFloat(m[1]) : null;
-}
-
 // ── Kabelio lygmens analizė ──
 export function analyzeCableWide(groups, RULES, formatWavelength, lang = 'lt') {
     const diags = [];
@@ -32,36 +26,51 @@ export function analyzeCableWide(groups, RULES, formatWavelength, lang = 'lt') {
 
     const labelOf = g => extractFiberId(g.group) || g.group;
 
-    // a) Bendra ORL problema (praleista, jei vartotojas ignoruoja ORL)
+    // a) ORL palyginimas tarp skaidulų (praleista, jei vartotojas ignoruoja ORL).
+    // SVARBU: reikšmės imamos TIESIOGIAI iš g.stats[wl].orl (žalia, kiekvienai
+    // skaidulai visada yra), o NE iš jau esančios per-failo ORL diagnozės teksto -
+    // ta diagnozė sukuriama TIK kai orl < RULES.orl.warn (žr. diagnostics.js
+    // diagnoseSingle), todėl geros ORL skaidulos joje neatsirastų ir liktų
+    // nematomos min/max/delta skaičiavimui, o disbalansas tarp geros ir blogos
+    // skaidulos niekada nebūtų aptiktas.
     const wlSet = new Set();
     if (!state.ignoreOrl) groups.forEach(g => (g.wavelengths || []).forEach(wl => wlSet.add(wl)));
     wlSet.forEach(wl => {
         const vals = [];
         groups.forEach(g => {
-            const ds = g.per_file[wl] || g.per_file[String(wl)];
-            if (!ds) return;
-            const orlD = ds.find(d => /ORL/i.test(d.category || ''));
-            if (!orlD) return;
-            const v = _parseOrlFromMsg(orlD.msg);
-            if (v !== null) vals.push({ label: labelOf(g), orl: v });
+            const s = g.stats && (g.stats[wl] || g.stats[String(wl)]);
+            if (!s || !(s.orl > 0)) return;
+            vals.push({ label: labelOf(g), orl: s.orl });
         });
         if (vals.length >= Math.max(2, groups.length - 1)) {
             const nums = vals.map(v => v.orl);
             const min = Math.min(...nums), max = Math.max(...nums);
-            if (max < RULES.orl.warn && (max - min) < 3) {
+            const delta = max - min;
+            // Visos (net geriausia) žemiau normos - tikėtina bendra priežastis
+            const isCommonLow = max < RULES.orl.warn;
+            // Didelis atotrūkis tarp geriausios ir prasčiausios - tikėtina
+            // KONKREČIOS skaidulos jungties problema, ne bendra
+            const isUnbalanced = delta >= 3;
+            if (isCommonLow || isUnbalanced) {
                 const labels = vals.map(v => v.label).join(', ');
+                const worst = vals.reduce((a, b) => (b.orl < a.orl ? b : a)).label;
+                // Disbalanso pranešimas prioritetiškesnis, nes jis nurodo
+                // KONKREČIĄ skaidulą, taigi yra veiksmingesnis nei bendras
+                const key = isUnbalanced ? 'cable_orl_unbalanced' : 'cable_common_orl';
                 diags.push({
                     sev: 'warning',
-                    category: t('cable_common_orl_title') + ' (' + formatWavelength(wl) + ' nm)',
-                    msg: t('cable_common_orl_msg', {
+                    category: t(key + '_title') + ' (' + formatWavelength(wl) + ' nm)',
+                    msg: t(key + '_msg', {
                         count: vals.length,
                         min: min.toFixed(1),
                         max: max.toFixed(1),
+                        delta: delta.toFixed(1),
                         warn: RULES.orl.warn,
                         wl: formatWavelength(wl),
-                        labels: labels
+                        labels: labels,
+                        worst: worst
                     }),
-                    rec: t('cable_common_orl_rec'),
+                    rec: t(key + '_rec'),
                     _scope: 'cable'
                 });
             }
